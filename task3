@@ -1,0 +1,120 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+from buzzness import Bee
+
+def plot_hive(hive, blist, ax):
+    """Plot the hive and bees"""
+    xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
+    yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
+    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
+    ax.scatter(xvalues, yvalues, c='yellow', s=100, edgecolors='black')
+    
+    # Add labels
+    ax.set_xlabel("X Coordinate")
+    ax.set_ylabel("Y Coordinate")
+    ax.set_title("Honey Comb Structure")
+
+def plot_world(world, hive_pos, ax):
+    """Function to plot the world array"""
+    # Plot the world with tab20 colormap
+    ax.imshow(world.T, origin="lower", cmap="tab20")
+    
+    # Plot the hive position as a square
+    hive_x, hive_y = hive_pos
+    rect = plt.Rectangle((hive_x-0.5, hive_y-0.5), 1, 1, fill=False, color='red', linewidth=2)
+    ax.add_patch(rect)
+    
+    # Add labels
+    ax.set_xlabel("X Coordinate")
+    ax.set_ylabel("Y Coordinate")
+    ax.set_title("Bee World Environment")
+
+# Define hive dimensions
+hiveX = 30
+hiveY = 25
+
+# Define world dimensions
+worldX = 40
+worldY = 40
+
+# Create a list to hold all the bees
+blist = []
+
+# Create five bees and append them to the blist
+for i in range(5):
+    # Create bees with random positions within the hive dimensions
+    bee = Bee(f"b{i}", (random.randint(0, hiveX-1), random.randint(0, hiveY-1)))
+    blist.append(bee)
+
+# Initialize the hive - this is a 2D array
+# 10 = not ready for honey
+# 0 = empty comb/hexagon cells 
+# 1-5 = increasing amounts of honey
+hive = np.ones((hiveX, hiveY)) * 10  # Default: not ready for honey
+
+# Create a stripe of comb (0 = empty cells) in the center
+center_row = hiveY // 2
+hive[:, center_row-1:center_row+1] = 0  # Create a horizontal stripe of comb
+
+# Add some alternating cells full of honey (values 1-5 represent increasing amounts of honey)
+for i in range(0, hiveX, 2):
+    hive[i, center_row-1] = random.randint(1, 5)  # Fill every other cell in first row
+    if i+1 < hiveX:
+        hive[i+1, center_row] = random.randint(1, 5)  # Fill alternating cells in second row
+
+# Define the hive position in the world
+hive_position = (worldX//2, worldY//2)  # Center of our world
+
+# Create the world array
+world = np.zeros((worldX, worldY), dtype=int)
+
+# Fill world with different terrain types (using different values for colors)
+# 0-4: Water areas
+world[0:8, 0:8] = 0  # Lake in bottom left
+world[0:5, 30:40] = 0  # Lake in bottom right
+
+# 5-8: Grass/fields
+world[8:25, 8:32] = 5  # Central grassland
+
+# 9-12: Forest/trees
+world[25:36, 5:20] = 9  # Forest in upper left
+world[15:30, 32:38] = 9  # Forest in upper right
+
+# 13-16: Flower patches
+world[12:18, 12:18] = 13  # Flower patch 1
+world[20:26, 24:30] = 13  # Flower patch 2
+
+# 17-19: Rocky areas
+world[36:40, 20:40] = 17  # Rocky area at top right
+
+# Create subplots to show the bees, hive, and world
+fig, axs = plt.subplots(1, 2, figsize=(15, 6))
+
+# Plot the hive in the first subplot
+plot_hive(hive, blist, axs[0])
+
+# Plot the world in the second subplot with the hive position
+plot_world(world, hive_position, axs[1])
+
+# Plot the bees on the world - convert to world coordinates
+for bee in blist:
+    # Convert bee positions to world coordinates for visualization
+    if bee.get_inhive():
+        # This is just for visualization in the world plot
+        world_x = hive_position[0] + (bee.get_pos()[0] - hiveX//2) // 2
+        world_y = hive_position[1] + (bee.get_pos()[1] - hiveY//2) // 2
+        # Keep within world boundaries
+        world_x = max(0, min(worldX-1, world_x))
+        world_y = max(0, min(worldY-1, world_y))
+        axs[1].scatter(world_x, world_y, c='yellow', s=100, edgecolors='black')
+
+# Add supertitle
+fig.suptitle("Complete Bee World Simulation", fontsize=16)
+
+# Save the figure
+fig.tight_layout(rect=[0, 0, 1, 0.95])  # Adjust layout to make room for suptitle
+fig.savefig("task3.png")
+
+# Show the plot
+plt.show()

@@ -1,0 +1,66 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+from buzzness import Bee
+
+def plot_hive(hive, blist, ax):
+    """Plot the hive and bees"""
+    xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
+    yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
+    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")  # Updated colormap to YlOrBr
+    ax.scatter(xvalues, yvalues, c='yellow', s=100, edgecolors='black')
+    
+    # Add labels
+    ax.set_xlabel("X Coordinate")
+    ax.set_ylabel("Y Coordinate")
+
+# Define hive dimensions
+hiveX = 30
+hiveY = 25
+
+# Create a list to hold all the bees
+blist = []
+
+# Create five bees and append them to the blist
+for i in range(5):
+    # Create bees with random positions within the hive dimensions
+    bee = Bee(f"b{i}", (random.randint(0, hiveX-1), random.randint(0, hiveY-1)))
+    blist.append(bee)
+
+# Initialize the hive - this is a 2D array
+# 10 = not ready for honey
+# 0 = empty comb/hexagon cells 
+# 1-5 = increasing amounts of honey
+hive = np.ones((hiveX, hiveY)) * 10  # Default: not ready for honey
+
+# Create a stripe of comb (0 = empty cells) in the center
+center_row = hiveY // 2
+hive[:, center_row-1:center_row+1] = 0  # Create a horizontal stripe of comb
+
+# Add some alternating cells full of honey (values 1-5 represent increasing amounts of honey)
+for i in range(0, hiveX, 2):
+    hive[i, center_row-1] = random.randint(1, 5)  # Fill every other cell in first row
+    if i+1 < hiveX:
+        hive[i+1, center_row] = random.randint(1, 5)  # Fill alternating cells in second row
+
+# Create a subplot to show the bees and hive with 2 columns
+fig, axs = plt.subplots(1, 2, figsize=(15, 6))
+
+# Plot the hive and bees in both subplots
+for i, ax in enumerate(axs):
+    plot_hive(hive, blist, ax)
+    # Add titles for each subplot
+    if i == 0:
+        ax.set_title("Honey Comb Cells")
+    else:
+        ax.set_title("Duplicate View")
+
+# Add supertitle
+fig.suptitle("Bee Hive with Honey Cells Visualization", fontsize=16)
+
+# Save the figure
+fig.tight_layout(rect=[0, 0, 1, 0.95])  # Adjust layout to make room for suptitle
+fig.savefig("task2.png")
+
+# Show the plot
+plt.show()

@@ -1,0 +1,47 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+from buzzness import Bee
+
+def plot_hive(hive, blist, ax):
+    """Plot the hive and bees"""
+    xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
+    yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
+    ax.imshow(hive.T, origin="lower", cmap="YlGn") 
+    ax.scatter(xvalues, yvalues, c='yellow', s=100, edgecolors='black')
+    
+    # Add labels and title
+    ax.set_title("Bee Colony Visualization")
+    ax.set_xlabel("X Coordinate")
+    ax.set_ylabel("Y Coordinate")
+
+# Define hive dimensions
+hiveX = 30
+hiveY = 25
+
+# Create a list to hold all the bees
+blist = []
+
+# Create five bees and append them to the blist
+for i in range(5):
+    # Create bees with random positions within the hive dimensions
+    bee = Bee(f"b{i}", (random.randint(0, hiveX-1), random.randint(0, hiveY-1)))
+    blist.append(bee)
+
+# Initialize the hive - this is a 2D array
+# 10 is brown, not ready
+# 0 is ready
+# 1-5 is honey level
+hive = np.ones((hiveX, hiveY)) * 10  # 10 = not ready for honey
+
+# Create a figure to show the bees and hive
+fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+
+# Plot the hive and bees
+plot_hive(hive, blist, ax)
+
+# Save the figure
+fig.savefig("task1.png")
+
+# Show the plot
+plt.show()

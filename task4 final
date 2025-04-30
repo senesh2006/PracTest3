@@ -1,0 +1,106 @@
+# task4.py - simulation of bee colony in a world with trees and flowers (10 timesteps, animated)
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+from buzzness import Bee
+
+def plot_hive(hive, blist, ax):
+    xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
+    yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
+    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
+    ax.scatter(xvalues, yvalues, c='yellow', s=100)
+    ax.set_title("Bee Hive")
+    ax.set_xlabel("X Position")
+    ax.set_ylabel("Y Position")
+
+def plot_world(world, hive_pos, blist, ax):
+    cmap = plt.get_cmap("tab20")
+    ax.imshow(world.T, origin="lower", cmap=cmap, vmin=0, vmax=19)
+    hx, hy = hive_pos
+    ax.add_patch(plt.Rectangle((hx, hy), 3, 3, color="white"))
+    xvalues = [b.get_pos()[0] for b in blist if not b.get_inhive()]
+    yvalues = [b.get_pos()[1] for b in blist if not b.get_inhive()]
+    ax.scatter(xvalues, yvalues, c='yellow', s=100)
+    ax.set_title("Property")
+    ax.set_xlabel("X Position")
+    ax.set_ylabel("Y Position")
+
+# Simulation settings
+simlength = 10
+hiveX, hiveY = 30, 25
+worldX, worldY = 45, 40
+
+# Hive setup
+hive = np.ones((hiveX, hiveY)) * 10
+for x in range(hiveX):
+    for y in range(hiveY):
+        if 13 <= x < 16:
+            hive[x, y] = 0
+            if x == 14 and y % 2 == 0:
+                hive[x, y] = 5
+
+# World setup
+grass = 5
+pond = 0
+pond2 = 14
+orange_square = 2
+flower = 12
+tree = 4
+small_square = 1
+
+world = np.ones((worldX, worldY), dtype=int) * grass
+world[30:40, 5:10] = pond
+world[5:10, 30:35] = pond2
+for x in range(1, 8, 2):
+    world[x:x+1, 2:5] = tree
+for x in range(24, 45, 2):
+    for y in range(20, 40, 2):
+        world[x:x+1, y:y+1] = flower
+world[18:20, 15:19]
+world[24, 20] = orange_square
+hive_pos = (20, 18)
+world[0, 0] = small_square
+
+# Bee initialization
+blist = []
+positions = [(10, 17), (5, 17), (5, 10), (5, 17), (10,17)]
+i = 1
+for pos in positions:
+    bee = Bee("b" + str(i), pos)
+    blist.append(bee)
+    i += 1
+
+# Move two bees out of hive
+bees_moved = 0
+for b in blist:
+    if b.get_inhive() and bees_moved < 2:
+        b.set_inhive(False)
+        bees_moved += 1
+
+# Enable live plotting
+plt.ion()
+
+# Simulation loop
+for t in range(simlength):
+    for b in blist:
+        if not b.get_inhive():
+            # Move using Moore neighborhood
+            x, y = b.get_pos()
+            moves = [(x + dx, y + dy)
+                     for dx in [-1, 0, 1]
+                     for dy in [-1, 0, 1]
+                     if not (dx == 0 and dy == 0)]
+            moves = [(nx, ny) for nx, ny in moves if 0 <= nx < worldX and 0 <= ny < worldY]
+            if moves:
+                b.set_pos(random.choice(moves))
+
+    # Plotting
+    fig, axes = plt.subplots(1, 2, figsize=(14, 7))
+    plot_hive(hive, blist, axes[0])
+    plot_world(world, hive_pos, blist, axes[1])
+    fig.suptitle(f"BEE WORLD - Timestep {t + 1}", fontsize=16)
+    fig.tight_layout()
+    plt.pause(1)
+    plt.clf()
+
+plt.ioff()

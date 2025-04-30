@@ -12,8 +12,9 @@ def plot_hive(hive, blist, ax):
     ax.set_xlabel("Position X")
     ax.set_ylabel("Position Y")
 
-def plot_world(world_img, hive_pos, blist, ax):
-    ax.imshow(world_img, origin="lower")
+def plot_world(world, hive_pos, blist, ax):
+    cmap = plt.get_cmap("tab20")
+    ax.imshow(world.T, origin="lower", cmap=cmap, vmin=0, vmax=19)
     hx, hy = hive_pos
     ax.add_patch(plt.Rectangle((hx, hy), 3, 3, color="white"))
     xvalues = [b.get_pos()[0] for b in blist if not b.get_inhive()]
@@ -56,21 +57,11 @@ world[0, 0] = small_square
 
 hive_pos = (20, 18)
 
-# Convert the world matrix to a static RGB image ONCE
-cmap = plt.get_cmap("tab20", 20)
-world_img = cmap(world / 19.0)
-
 blist = []
-positions = [(10, 17), (5, 17), (5, 10), (5, 17), (10,17)]
+positions = [(14, 14), (14, 15), (14, 16), (15, 14), (15, 15)]
 for i, pos in enumerate(positions):
     bee = Bee("b" + str(i+1), pos)
     blist.append(bee)
-
-moved = 0
-for b in blist:
-    if b.get_inhive() and moved < 2:
-        b.set_inhive(False)
-        moved += 1
 
 moore = [(-1, -1), (-1, 0), (-1, 1),
          ( 0, -1),          ( 0, 1),
@@ -78,17 +69,19 @@ moore = [(-1, -1), (-1, 0), (-1, 1),
 
 for t in range(simlength):
     for b in blist:
-        if not b.get_inhive():
+        if b.get_inhive():
             x, y = b.get_pos()
             dx, dy = random.choice(moore)
             new_x = max(0, min(x + dx, worldX - 1))
             new_y = max(0, min(y + dy, worldY - 1))
             b.pos = (new_x, new_y)
+            b.set_inhive(False)
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 7))
     plot_hive(hive, blist, axes[0])
-    plot_world(world_img, hive_pos, blist, axes[1])
+    plot_world(world, hive_pos, blist, axes[1])
     fig.suptitle(f"Task 4 - Bee Simulation (Timestep {t + 1})", fontsize=16)
     fig.tight_layout()
     plt.show()
+
 

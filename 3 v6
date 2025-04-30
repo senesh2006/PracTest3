@@ -1,0 +1,109 @@
+import matplotlib.pyplot as plt
+import numpy as np
+from buzzness import Bee
+
+# --- Plot the Hive ---
+def plot_hive(hive, blist, ax):
+    xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
+    yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
+    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
+    ax.scatter(xvalues, yvalues, c='yellow', s=100)
+    ax.set_title("Hive Overview")
+    ax.set_xlabel("Hive Width (X)")
+    ax.set_ylabel("Hive Height (Y)")
+
+# --- Plot the World ---
+def plot_world(world, hive_pos, blist, ax):
+    cmap = plt.get_cmap("tab20")
+    ax.imshow(world.T, origin="lower", cmap=cmap, vmin=0, vmax=19)
+    # Hive red rectangle
+    hx, hy = hive_pos
+    ax.add_patch(plt.Rectangle((hx, hy), 3, 3, color="white"))
+    # Bees in world
+    xvalues = [b.get_pos()[0] for b in blist if not b.get_inhive()]
+    yvalues = [b.get_pos()[1] for b in blist if not b.get_inhive()]
+    ax.scatter(xvalues, yvalues, c='yellow', s=100)  
+    ax.set_title("Bee World Overview")
+    ax.set_xlabel("World Width (X)")
+    ax.set_ylabel("World Height (Y)")
+
+# Parameters
+simlength = 1
+hiveX, hiveY = 30, 25
+worldX, worldY = 45, 40
+
+# Hive grid
+hive = np.ones((hiveX, hiveY)) * 10
+for x in range(hiveX):
+    for y in range(hiveY):
+        if 13 <= x < 16:
+            hive[x, y] = 0
+            if x == 14 and y % 2 == 0:
+                hive[x, y] = 5
+
+# --- Create the world array ---
+# Color assignments (based on tab20 indices)
+GRASS = 5
+POND = 0
+POND2 = 14
+ORANGE_SQUARE = 2
+FLOWER = 12
+TREE = 4
+SMALL_SQUARE = 1
+
+
+# Start with grass
+world = np.ones((worldX, worldY), dtype=int) * GRASS
+
+# Ponds
+world[30:40, 5:10] = POND
+world[5:10, 30:35] = POND2
+
+# Trees
+for x in range(0, 8, 2):
+    world[x:x+1, 1:4] = TREE
+
+# Flowers
+for x in range(24, 45, 2):
+    for y in range(20, 40, 2):
+        world[x:x+1, y:y+1] = FLOWER
+
+# Hive entrance
+world[18:20, 15:19]
+
+# Orange square
+world[24, 20] = ORANGE_SQUARE
+
+# Hive position in world
+hive_pos = (20, 18)
+
+world[0, 0] = SMALL_SQUARE
+# --- Bee setup ---
+blist = []
+positions = [(10, 17), (5, 17), (5, 10), (5, 17), (10,17)]
+
+i = 1
+for pos in positions:
+    bee = Bee("b" + str(i), pos)
+    blist.append(bee)
+    i += 1
+
+# Move 2 bees from hive to world
+bees_moved = 0
+for b in blist:
+    if b.get_inhive() and bees_moved < 2:
+        b.set_inhive(False)
+        bees_moved += 1
+
+# --- Simulation Loop ---
+for t in range(simlength):
+    for b in blist:
+        b.step_change()
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 7))
+    plot_hive(hive, blist, axes[0])
+    plot_world(world, hive_pos, blist, axes[1])
+    fig.suptitle("Task 3 - BEE WORLD", fontsize=16)
+    fig.tight_layout()
+    fig.savefig("task3.png")
+    plt.show()

@@ -12,15 +12,19 @@ import numpy as np
 from buzzness import Bee
 
 def plot_hive(hive, blist, ax):
+    # Plot the hive environment
+    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
+    
+    # Plot bees inside the hive
     xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
     yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
-    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
     ax.scatter(xvalues, yvalues, c='yellow', s=100)
+    
     ax.set_title("Bee Hive")
     ax.set_xlabel("X Position")
     ax.set_ylabel("Y Position")
 
-def plot_world(world, blist, ax):
+def plot_world(world, hive_pos, blist, ax):
     # Create green background
     ax.imshow(world.T, origin="lower", cmap="Greens", vmin=3, vmax=6)
     
@@ -52,32 +56,18 @@ def plot_world(world, blist, ax):
     yvalues = [b.get_pos()[1] for b in blist if not b.get_inhive()]
     ax.scatter(xvalues, yvalues, c='yellow', s=100)
     
+    # Add red rectangle around hive position as per your code
+    ax.add_patch(plt.Rectangle((hive_pos[0]-2, hive_pos[1]-2), 4, 4, fill=False, edgecolor='red', linewidth=2))
+    
     ax.set_title("Property")
     ax.set_xlabel("X Position")
     ax.set_ylabel("Y Position")
-
-# Update the Bee class to include all 9 Moore neighborhood cells
-class EnhancedBee(Bee):
-    def get_valid_moves(self):
-        """Return list of valid moves in the Moore neighborhood (all 8 surrounding cells + current position)"""
-        x, y = self.get_pos()
-        moves = []
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                moves.append((x + dx, y + dy))
-        return moves
-    
-    def step_change(self):
-        """Update the bee's position with a randomly chosen move from valid moves"""
-        valid_moves = self.get_valid_moves()
-        if valid_moves:
-            new_pos = valid_moves[np.random.randint(0, len(valid_moves))]
-            self.set_pos(new_pos)
 
 # Set simulation parameters
 simlength = 10  # Changed to 10 as requested
 hiveX, hiveY = 30, 25
 worldX, worldY = 45, 40
+hive_pos = (20, 20)  # Position of the hive in the world
 
 # Create hive grid
 hive = np.ones((hiveX, hiveY)) * 10
@@ -95,17 +85,39 @@ world = np.ones((worldX, worldY)) * 5
 blist = []
 # Bees inside the hive
 hive_bee_positions = [(5, 11), (5, 16), (10, 14)]
-for i, pos in enumerate(hive_bee_positions):
-    bee = Bee(f"bee{i+1}", pos)
+for pos in hive_bee_positions:
+    bee = Bee(f"bee_hive_{pos}", pos)
     bee.set_inhive(True)
     blist.append(bee)
 
 # Bees outside the hive
 world_bee_positions = [(10, 16), (16, 16)]
-for i, pos in enumerate(world_bee_positions):
-    bee = Bee(f"bee{i+4}", pos)
+for pos in world_bee_positions:
+    bee = Bee(f"bee_world_{pos}", pos)
     bee.set_inhive(False)
     blist.append(bee)
+
+# Function to move bees within the hive walls
+def move_hive_bees(blist, hive):
+    for bee in blist:
+        if bee.get_inhive():
+            x, y = bee.get_pos()
+            
+            # Generate random movement but keep within bounds
+            # and avoid the central wall (13 <= x < 16)
+            valid_moves = []
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    new_x, new_y = x + dx, y + dy
+                    # Check if movement is within hive bounds and not in the wall
+                    if (0 <= new_x < hive.shape[0] and 0 <= new_y < hive.shape[1] and 
+                        not (13 <= new_x < 16)):
+                        valid_moves.append((new_x, new_y))
+            
+            # If there are valid moves, choose one randomly
+            if valid_moves:
+                new_pos = valid_moves[np.random.randint(0, len(valid_moves))]
+                bee.set_pos(new_pos)
 
 # Enable interactive mode for matplotlib
 plt.ion()
@@ -119,13 +131,12 @@ for t in range(simlength):
     for ax in axes:
         ax.clear()
     
-    # Update bee positions
-    for b in blist:
-        b.step_change()
+    # Move only the bees in the hive (bees in the world stay stationary)
+    move_hive_bees(blist, hive)
     
     # Plot the current state
     plot_hive(hive, blist, axes[0])
-    plot_world(world, blist, axes[1])
+    plot_world(world, hive_pos, blist, axes[1])
     
     # Set the main title with timestep
     fig.suptitle(f"BEE WORLD - Timestep {t+1}", fontsize=16)

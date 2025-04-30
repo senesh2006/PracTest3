@@ -104,3 +104,4 @@ for t in range(simlength):
     plt.show()
     plt.pause(1)
     plt.clf()
+

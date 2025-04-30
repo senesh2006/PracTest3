@@ -1,33 +1,73 @@
+# Student Name: <put your name here> 
+# Student ID:   <put your ID here>
+#
+# beeworld.py - simulation of bee colony in a world with trees and flowers
+#
+# Version information: 
+#
+# Usage: <how to run the program>
+#
 import matplotlib.pyplot as plt
 import numpy as np
-import random
 from buzzness import Bee
 
 def plot_hive(hive, blist, ax):
+    # Create a brown background for hive
+    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
+    
+    # Draw bees in the hive with yellow circles
     xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
     yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
-    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
-    ax.scatter(xvalues, yvalues, c='yellow', s=100)
+    ax.scatter(xvalues, yvalues, c='yellow', s=50)
+    
+    # Set axis labels
+    ax.set_xlabel("X Position")
+    ax.set_ylabel("Y Position")
+    
+    # Set title
     ax.set_title("Bee Hive")
-    ax.set_xlabel("Position X")
-    ax.set_ylabel("Position Y")
 
-def plot_world(world, hive_pos, blist, ax):
-    cmap = plt.get_cmap("tab20")
-    ax.imshow(world.T, origin="lower", cmap=cmap, vmin=0, vmax=19)
-    hx, hy = hive_pos
-    ax.add_patch(plt.Rectangle((hx, hy), 3, 3, color="white"))
+def plot_world(world, blist, ax):
+    # Create a green background for world
+    ax.imshow(world.T, origin="lower", cmap="Greens", vmin=3, vmax=6)
+    
+    # Draw features
+    # Add blue pond
+    ax.add_patch(plt.Rectangle((30, 5), 10, 5, color="blue"))
+    
+    # Add gray square
+    ax.add_patch(plt.Rectangle((15, 30), 5, 5, color="gray"))
+    
+    # Add white square
+    ax.add_patch(plt.Rectangle((20, 20), 2, 2, color="white"))
+    
+    # Add green bars for trees
+    for i in range(4):
+        ax.add_patch(plt.Rectangle((i+1, 1), 1, 3, color="green"))
+    
+    # Add magenta dots for flowers in grid pattern
+    for x in range(30, 42, 2):
+        for y in range(5, 40, 2):
+            ax.scatter(x, y, c='magenta', s=15, marker='s')
+    
+    # Draw bees that are outside the hive
     xvalues = [b.get_pos()[0] for b in blist if not b.get_inhive()]
     yvalues = [b.get_pos()[1] for b in blist if not b.get_inhive()]
-    ax.scatter(xvalues, yvalues, c='yellow', s=100)
-    ax.set_title("Bee World")
-    ax.set_xlabel("Position X")
-    ax.set_ylabel("Position Y")
+    ax.scatter(xvalues, yvalues, c='yellow', s=50)
+    
+    # Set axis labels
+    ax.set_xlabel("X Position")
+    ax.set_ylabel("Y Position")
+    
+    # Set title
+    ax.set_title("Property")
 
-simlength = 10
-hiveX, hiveY = 30, 25
+# Set simulation parameters
+timestep = 2  # Current timestep number
 worldX, worldY = 45, 40
+hiveX, hiveY = 30, 25
 
+# Create hive grid
 hive = np.ones((hiveX, hiveY)) * 10
 for x in range(hiveX):
     for y in range(hiveY):
@@ -36,52 +76,39 @@ for x in range(hiveX):
             if x == 14 and y % 2 == 0:
                 hive[x, y] = 5
 
-grass = 5
-pond = 0
-pond2 = 14
-orange_square = 2
-flower = 12
-tree = 4
-small_square = 1
+# Create world grid (basic green background)
+world = np.ones((worldX, worldY)) * 5
 
-world = np.ones((worldX, worldY), dtype=int) * grass
-world[30:40, 5:10] = pond
-world[5:10, 30:35] = pond2
-for x in range(1, 8, 2):
-    world[x:x+1, 2:5] = tree
-for x in range(24, 45, 2):
-    for y in range(20, 40, 2):
-        world[x:x+1, y:y+1] = flower
-world[24, 20] = orange_square
-world[0, 0] = small_square
-
-hive_pos = (20, 18)
-
+# Create bees with positions matching the image
 blist = []
-positions = [(14, 14), (14, 15), (14, 16), (15, 14), (15, 15)]
-for i, pos in enumerate(positions):
-    bee = Bee("b" + str(i+1), pos)
+# For bees in the hive (left plot)
+hive_bee_positions = [(5, 11), (5, 16), (9, 14)]
+for i, pos in enumerate(hive_bee_positions):
+    bee = Bee(f"bee{i+1}", pos)
+    bee.set_inhive(True)
     blist.append(bee)
 
-moore = [(-1, -1), (-1, 0), (-1, 1),
-         ( 0, -1),          ( 0, 1),
-         ( 1, -1), ( 1, 0), ( 1, 1)]
+# For bees outside the hive (right plot)
+world_bee_positions = [(10, 16), (16, 16)]
+for i, pos in enumerate(world_bee_positions):
+    bee = Bee(f"bee{i+4}", pos)
+    bee.set_inhive(False)
+    blist.append(bee)
 
-for t in range(simlength):
-    for b in blist:
-        if b.get_inhive():
-            x, y = b.get_pos()
-            dx, dy = random.choice(moore)
-            new_x = max(0, min(x + dx, worldX - 1))
-            new_y = max(0, min(y + dy, worldY - 1))
-            b.pos = (new_x, new_y)
-            b.set_inhive(False)
+# Create the plot
+fig, axes = plt.subplots(1, 2, figsize=(12, 6))
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 7))
-    plot_hive(hive, blist, axes[0])
-    plot_world(world, hive_pos, blist, axes[1])
-    fig.suptitle(f"Task 4 - Bee Simulation (Timestep {t + 1})", fontsize=16)
-    fig.tight_layout()
-    plt.show()
+# Plot the hive and world
+plot_hive(hive, blist, axes[0])
+plot_world(world, blist, axes[1])
 
+# Set the main title
+fig.suptitle(f"BEE WORLD - Timestep {timestep}", fontsize=16)
 
+# Adjust layout
+plt.tight_layout()
+plt.subplots_adjust(top=0.9)
+
+# Save and show the figure
+plt.savefig("beeworld_timestep2.png")
+plt.show()

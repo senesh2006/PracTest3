@@ -1,0 +1,67 @@
+# Student Name: Senesh Fernando
+# Student ID:   12345678
+#
+# task4.py - simulation of bee colony with bee movement using Moore neighborhood
+#
+# Usage: Run this script to observe bee movement over 10 steps
+
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+from buzzness import Bee
+
+def plot_hive(hive, blist, ax):
+    # Plot the hive and bees inside it
+    xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
+    yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
+    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
+    ax.scatter(xvalues, yvalues, c='yellow', s=100)
+    ax.set_title("Bee Hive")
+    ax.set_xlabel("X Position")
+    ax.set_ylabel("Y Position")
+
+# Set the number of timesteps
+simlength = 10
+
+# Hive size
+hiveX = 30
+hiveY = 25
+
+# Create hive matrix (all zeros initially)
+hive = np.zeros((hiveX, hiveY))
+
+# Create a bee and place it at a position
+bee1 = Bee("b1", (5, 10))
+blist = [bee1]
+
+# At start, move the bee out of the hive
+bee1.set_inhive(False)
+
+# Directions for Moore neighborhood (8 directions)
+directions = [(-1, -1), (-1, 0), (-1, 1),
+              ( 0, -1),          ( 0, 1),
+              ( 1, -1), ( 1, 0), ( 1, 1)]
+
+plt.ion()  # Enable interactive mode
+
+for t in range(simlength):
+    # Move each bee
+    for b in blist:
+        if not b.get_inhive():
+            x, y = b.get_pos()
+            dx, dy = random.choice(directions)
+            new_x = max(0, min(x + dx, hiveX - 1))
+            new_y = max(0, min(y + dy, hiveY - 1))
+            b.pos = (new_x, new_y)  # Manually update bee's position
+
+    # Clear previous plot
+    plt.clf()
+
+    # Plot current state
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    plot_hive(hive, blist, ax)
+    fig.suptitle(f"Bee World - Timestep {t + 1}", fontsize=16)
+    plt.pause(1)
+
+plt.ioff()
+plt.show()

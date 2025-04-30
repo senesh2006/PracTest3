@@ -1,0 +1,36 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
+def plot_hive(ax):
+    hive = np.full((30, 25), 10)  # Initialize hive grid
+    hive[:, 12] = 0  # Narrow entrance to the hive
+    ax.imshow(hive.T, origin="lower", cmap="copper")  # Hive visualization
+    ax.scatter([10, 15, 15], [10, 15, 5], color="yellow", s=50)  # Bees inside hive
+    ax.set_title("Bee Hive")
+    ax.set_xlabel("X Position")
+    ax.set_ylabel("Y Position")
+
+def plot_property(ax):
+    world = np.zeros((50, 40))  # Initialize property grid
+    world[5:10, 0:5] = 2  # Trees
+    world[30:35, 20:25] = 3  # Pond
+    world[15:25, 35:40] = 4  # Flowers
+    world[10, 10] = 1  # Single white patch
+    
+    cmap = plt.cm.get_cmap("summer", 5)  # Use 5 distinct colors in the summer colormap
+    ax.imshow(world.T, origin="lower", cmap=cmap)  # Property visualization
+    ax.scatter([5, 10], [5, 10], color="yellow", s=50)  # Bees outside hive
+    ax.set_title("Property")
+    ax.set_xlabel("X Position")
+    ax.set_ylabel("Y Position")
+
+def main():
+    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
+    plot_hive(axes[0])
+    plot_property(axes[1])
+    plt.suptitle("BEE WORLD - Timestep 2", fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.show()
+
+if __name__ == "__main__":
+    main()

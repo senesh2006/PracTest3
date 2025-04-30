@@ -12,60 +12,72 @@ import numpy as np
 from buzzness import Bee
 
 def plot_hive(hive, blist, ax):
-    # Create a brown background for hive
-    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
-    
-    # Draw bees in the hive with yellow circles
     xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
     yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
-    ax.scatter(xvalues, yvalues, c='yellow', s=50)
-    
-    # Set axis labels
+    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
+    ax.scatter(xvalues, yvalues, c='yellow', s=100)
+    ax.set_title("Bee Hive")
     ax.set_xlabel("X Position")
     ax.set_ylabel("Y Position")
-    
-    # Set title
-    ax.set_title("Bee Hive")
 
 def plot_world(world, blist, ax):
-    # Create a green background for world
+    # Create green background
     ax.imshow(world.T, origin="lower", cmap="Greens", vmin=3, vmax=6)
     
-    # Draw features
-    # Add blue pond
+    # Add features using patches
+    # Blue pond
     ax.add_patch(plt.Rectangle((30, 5), 10, 5, color="blue"))
     
-    # Add gray square
-    ax.add_patch(plt.Rectangle((15, 30), 5, 5, color="gray"))
+    # Gray square
+    ax.add_patch(plt.Rectangle((20, 30), 5, 5, color="gray"))
     
-    # Add white square
+    # White square
     ax.add_patch(plt.Rectangle((20, 20), 2, 2, color="white"))
     
-    # Add green bars for trees
-    for i in range(4):
-        ax.add_patch(plt.Rectangle((i+1, 1), 1, 3, color="green"))
+    # Green area at bottom left
+    ax.add_patch(plt.Rectangle((0, 0), 5, 4, color="green", alpha=0.7))
     
-    # Add magenta dots for flowers in grid pattern
+    # Magenta flower grid
     for x in range(30, 42, 2):
         for y in range(5, 40, 2):
             ax.scatter(x, y, c='magenta', s=15, marker='s')
     
+    # Darker blue/purple flower area
+    for x in range(30, 38):
+        for y in range(5, 10):
+            ax.scatter(x, y, c='blue', s=50, marker='s', alpha=0.7)
+    
     # Draw bees that are outside the hive
     xvalues = [b.get_pos()[0] for b in blist if not b.get_inhive()]
     yvalues = [b.get_pos()[1] for b in blist if not b.get_inhive()]
-    ax.scatter(xvalues, yvalues, c='yellow', s=50)
+    ax.scatter(xvalues, yvalues, c='yellow', s=100)
     
-    # Set axis labels
+    ax.set_title("Property")
     ax.set_xlabel("X Position")
     ax.set_ylabel("Y Position")
+
+# Update the Bee class to include all 9 Moore neighborhood cells
+class EnhancedBee(Bee):
+    def get_valid_moves(self):
+        """Return list of valid moves in the Moore neighborhood (all 8 surrounding cells + current position)"""
+        x, y = self.get_pos()
+        moves = []
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                moves.append((x + dx, y + dy))
+        return moves
     
-    # Set title
-    ax.set_title("Property")
+    def step_change(self):
+        """Update the bee's position with a randomly chosen move from valid moves"""
+        valid_moves = self.get_valid_moves()
+        if valid_moves:
+            new_pos = valid_moves[np.random.randint(0, len(valid_moves))]
+            self.set_pos(new_pos)
 
 # Set simulation parameters
-timestep = 2  # Current timestep number
-worldX, worldY = 45, 40
+simlength = 10  # Changed to 10 as requested
 hiveX, hiveY = 30, 25
+worldX, worldY = 45, 40
 
 # Create hive grid
 hive = np.ones((hiveX, hiveY)) * 10
@@ -79,36 +91,53 @@ for x in range(hiveX):
 # Create world grid (basic green background)
 world = np.ones((worldX, worldY)) * 5
 
-# Create bees with positions matching the image
+# Create bees
 blist = []
-# For bees in the hive (left plot)
-hive_bee_positions = [(5, 11), (5, 16), (9, 14)]
+# Bees inside the hive
+hive_bee_positions = [(5, 11), (5, 16), (10, 14)]
 for i, pos in enumerate(hive_bee_positions):
     bee = Bee(f"bee{i+1}", pos)
     bee.set_inhive(True)
     blist.append(bee)
 
-# For bees outside the hive (right plot)
+# Bees outside the hive
 world_bee_positions = [(10, 16), (16, 16)]
 for i, pos in enumerate(world_bee_positions):
     bee = Bee(f"bee{i+4}", pos)
     bee.set_inhive(False)
     blist.append(bee)
 
-# Create the plot
+# Enable interactive mode for matplotlib
+plt.ion()
+
+# Create the figure once
 fig, axes = plt.subplots(1, 2, figsize=(12, 6))
 
-# Plot the hive and world
-plot_hive(hive, blist, axes[0])
-plot_world(world, blist, axes[1])
+# Simulation loop
+for t in range(simlength):
+    # Clear previous plot
+    for ax in axes:
+        ax.clear()
+    
+    # Update bee positions
+    for b in blist:
+        b.step_change()
+    
+    # Plot the current state
+    plot_hive(hive, blist, axes[0])
+    plot_world(world, blist, axes[1])
+    
+    # Set the main title with timestep
+    fig.suptitle(f"BEE WORLD - Timestep {t+1}", fontsize=16)
+    
+    # Adjust layout
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.9)
+    
+    # Update the display and pause
+    plt.draw()
+    plt.pause(1)
 
-# Set the main title
-fig.suptitle(f"BEE WORLD - Timestep {timestep}", fontsize=16)
-
-# Adjust layout
-plt.tight_layout()
-plt.subplots_adjust(top=0.9)
-
-# Save and show the figure
-plt.savefig("beeworld_timestep2.png")
+# Disable interactive mode when done
+plt.ioff()
 plt.show()

@@ -1,0 +1,87 @@
+'''
+  Practical Test 4
+
+  accounts.py - class for bank account portfolio
+  
+  Student Name   :
+  Student Number :
+  Date/prac time :
+'''
+
+class Portfolio():
+    def _init_(self):
+        self.accounts = []
+
+    def addAccount(self, name, number, balance):
+        self.accounts.append(BankAccount(name, number, balance))
+
+    def deposit(self, name, amount):
+        temp = None
+        for acct in self.accounts:
+            if acct.name == name:
+                temp = acct
+        if temp:
+            print(f"--> Depositing ${amount} into account {name}")
+            temp.deposit(amount)
+            print("         Complete")
+
+    def withdraw(self, name, amount):
+        temp = None
+        for acct in self.accounts:
+            if acct.name == name:
+                temp = acct
+        if temp:
+            print(f"--> Withdrawing ${amount} from account {name}")
+            try:
+                temp.withdraw(amount)
+                print("         Complete")
+            except InsufficientFundsError as e:
+                print(f"    ****  Exception: {e}")
+            except Exception as e:
+                print(f"    ****  {e}")
+
+    def balances(self):
+        print("\n")
+        print('<------------------  Balances of All Accounts  ------------------>')
+        total = 0
+        print("\n")
+        for acct in self.accounts:
+            print(f"Name: {acct.name:<10}  Number: {acct.num:<10}  Balance: {acct.bal:<5}")
+            total += acct.bal
+        print("\n")
+        print(f"{'':<38}Total:  {total}")
+        print('<----------------------------------------------------------------->\n')
+        print("\n")
+    def getNumAccounts(self):
+        num_of_accs = len(self.accounts)
+        print(f"Number of Accounts:  {num_of_accs}")
+
+    def getTotalBalance(self):
+        total_balance = sum(acct.bal for acct in self.accounts)
+        print(f"Total Balance of Accounts:  {total_balance}")
+
+
+class BankAccount():
+    def _init_(self, name, number, balance):
+        self.name = name
+        self.num = number
+        self.bal = balance
+
+    def withdraw(self, amount):
+        if self.bal < amount:
+            raise InsufficientFundsError('Withdrawal exceeds balance')
+        else:
+            self.bal -= amount
+
+    def deposit(self, amount):
+        if amount < 0:
+            raise ValueError("Deposit amount must be positive")
+        self.bal += amount
+
+
+class InsufficientFundsError(Exception):
+    pass
+
+
+class AccountNotFoundError(Exception):
+    pass

@@ -1,0 +1,51 @@
+'''
+  Practical Test 4
+
+  testAccounts.py - program to test functions of accounts.py
+  
+  Student Name   :
+  Student Number :
+  Date/prac time :
+'''
+from accounts import BankAccount, Portfolio, InsufficientFundsError
+
+print('\n<--- Bank Accounts Portfolio --->\n')
+myAccounts = Portfolio()
+
+myAccounts.addAccount("Castle", "999999-1", 1000)
+myAccounts.addAccount("Shrubbery", "999999-2", 100)
+myAccounts.addAccount("Grail", "999999-3", 100)
+
+myAccounts.deposit("Castle", 100)
+
+try:
+    myAccounts.withdraw("Shrubbery", 10)
+except InsufficientFundsError as e:
+    print("Withdrawal Failed -", e)
+
+try:
+    myAccounts.withdraw("Shrubbery", 1000)
+except InsufficientFundsError as e:
+    print("Withdrawal Failed -", e)
+
+try:
+    myAccounts.withdraw("Grail", 1000)
+except InsufficientFundsError as e:
+    print("Withdrawal Failed -", e)
+
+myAccounts.balances()
+
+myAccounts.deposit("Grail", 100)
+
+myAccounts.balances()
+
+myAccounts.getNumAccounts()
+
+myAccounts.getTotalBalance()
+
+try:
+    myAccounts.withdraw("Grail", 1000)
+except InsufficientFundsError as e:
+    print("Withdrawal Failed -", e)
+
+myAccounts.balances()

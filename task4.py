@@ -1,0 +1,116 @@
+#Student Name: Mihindukulasuriya Peter Senesh Fernando 
+# Student ID:   22854577
+#
+# beeworld.py - simulation of bee colony in a world with trees and flowers
+#
+# Version information: Version 1
+#
+# Usage: Calling the program through terminal
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+from buzzness import Bee
+
+IS_TASK4 = True
+
+class BeeTask4(Bee):
+    def step_change(self, subgrid=None):
+        validmoves = [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1),
+                      (1, 1), (-1, -1), (1, -1), (-1, 1)]
+        move = random.choice(validmoves)
+        print(f"Bee {self.ID} at {self.pos} moves {move}")
+        new_x = self.pos[0] + move[0]
+        new_y = self.pos[1] + move[1]
+        self.pos = (new_x, new_y)
+
+def plot_hive(hive, blist, ax):
+    xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
+    yvalues = [b.get_pos()[1] for b in blist if b.get_inhive()]
+    ax.imshow(hive.T, origin="lower", cmap="YlOrBr")
+    ax.scatter(xvalues, yvalues, c='yellow', s=100)
+    ax.set_aspect('equal')
+    ax.set_title("Bee Hive")
+    ax.set_xlabel("position X")
+    ax.set_ylabel("position Y")
+
+def plot_world(world, hive_pos, blist, ax):
+    cmap = plt.get_cmap("tab20")
+    ax.imshow(world.T, origin="lower", cmap=cmap, vmin=0, vmax=19)
+    hx, hy = hive_pos
+    ax.add_patch(plt.Rectangle((hx, hy), 3, 3, color="white"))
+    xvalues = [b.get_pos()[0] for b in blist if not b.get_inhive()]
+    yvalues = [b.get_pos()[1] for b in blist if not b.get_inhive()]
+    ax.scatter(xvalues, yvalues, c='yellow', s=100)
+    ax.set_title("Bee World")
+    ax.set_aspect('equal')
+    ax.set_xlabel("position X")
+    ax.set_ylabel("position Y")
+
+simlength = 10
+hiveX, hiveY = 30, 25
+worldX, worldY = 45, 40
+
+hive = np.ones((hiveX, hiveY)) * 10
+for x in range(hiveX):
+    for y in range(hiveY):
+        if 13 <= x < 16:
+            hive[x, y] = 0
+            if x == 14 and y % 2 == 0:
+                hive[x, y] = 5
+
+GRASS = 5
+POND = 0
+POND2 = 14
+ORANGE_SQUARE = 3
+FLOWER = 12
+TREE = 4
+HIVE_ENTRANCE = 6
+BLUE_SQUARE = 1
+
+world = np.ones((worldX, worldY), dtype=int) * GRASS
+world[30:40, 5:10] = POND
+world[5:10, 30:35] = POND2
+for x in range(0, 10, 2):
+    world[x:x+1, 1:4] = TREE
+for x in range(24, 45, 2):
+    for y in range(20, 40, 2):
+        world[x:x+1, y:y+1] = FLOWER
+world[24, 20] = ORANGE_SQUARE
+world[0, 0] = BLUE_SQUARE
+hive_pos = (20, 19)
+
+blist = []
+positions = [(10, 18), (5, 18), (5, 10), (5, 14), (10, 14)]
+
+i = 1
+for pos in positions:
+    if IS_TASK4:
+        bee = BeeTask4("b" + str(i), pos)
+    else:
+        bee = Bee("b" + str(i), pos)
+    blist.append(bee)
+    i += 1
+
+bees_moved = 0
+for b in blist:
+    if b.get_inhive() and bees_moved < 2:
+        b.set_inhive(False)
+        bees_moved += 1
+
+plt.ion()
+
+for t in range(simlength):
+    for b in blist:
+        b.step_change()
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    plot_hive(hive, blist, axes[0])
+    plot_world(world, hive_pos, blist, axes[1])
+    fig.suptitle(f"Task 4 - BEE WORLD : Timestep {t+1}", fontsize=16)
+    fig.tight_layout()
+    fig.savefig("task4.png")
+    plt.show()
+    plt.pause(1)
+    plt.clf()

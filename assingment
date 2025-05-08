@@ -27,10 +27,10 @@ class SimulationConfig:
     def __init__(self):
         self.world_size = (100, 80)
         self.hive_pos = (50, 40)
-        self.max_steps = 200
-        self.initial_bees = 20
-        self.communication_range = 8
-        self.nectar_capacity = 5
+        self.max_steps = 150
+        self.initial_bees = 25
+        self.communication_range = 10
+        self.nectar_capacity = 8
 
 class World:
     def __init__(self, size):
@@ -68,29 +68,21 @@ class Hive:
         self.hexagons = []
         self.cell_nectar = {}
         
-        hex_radius = 6
+        hex_radius = 8
         vertical_spacing = hex_radius * np.sqrt(3)
         
-        # Left hexagons
-        for i in range(3):
-            x = hive_pos[0] - hex_radius * 2
-            y = hive_pos[1] + (i - 1) * vertical_spacing
-            self.hexagons.append((x, y, hex_radius))
-            self.cell_nectar[(x, y)] = 0
-            
-        # Right hexagons
-        for i in range(3):
-            x = hive_pos[0] + hex_radius * 2
-            y = hive_pos[1] + (i - 1) * vertical_spacing
-            self.hexagons.append((x, y, hex_radius))
-            self.cell_nectar[(x, y)] = 0
+        for side in [-1, 1]:
+            for i in range(3):
+                x = hive_pos[0] + side * hex_radius * 2
+                y = hive_pos[1] + (i - 1) * vertical_spacing
+                self.hexagons.append((x, y, hex_radius))
+                self.cell_nectar[(x, y)] = 0
 
     def add_honey(self, amount):
         self.honey_stored += amount
         for pos in self.hexagons:
-            x, y, r = pos
-            if self.cell_nectar[(x, y)] < 10:
-                self.cell_nectar[(x, y)] += amount
+            if self.cell_nectar[pos] < 10:
+                self.cell_nectar[pos] = min(10, self.cell_nectar[pos] + amount)
                 break
 
 class Bee:
@@ -127,7 +119,7 @@ class Bee:
     def step_change(self, world, hive):
         if self.state == BeeState.IN_HIVE:
             self.steps_in_hive += 1
-            if random.random() < 0.2 and self.steps_in_hive > 3:
+            if random.random() < 0.3 and self.steps_in_hive > 2:
                 self.start_mission()
         
         elif self.state == BeeState.SEEKING_NECTAR:
@@ -143,8 +135,8 @@ class Bee:
         else:
             dx, dy = random.choice([(0,1),(1,0),(0,-1),(-1,0),(1,1),(-1,-1),(1,-1),(-1,1)])
         
-        new_x = max(0, min(world.grid.shape[0]-1, self.pos[0] + dx))
-        new_y = max(0, min(world.grid.shape[1]-1, self.pos[1] + dy))
+        new_x = max(0, min(world.grid.shape[0]-1, self.pos[0] + dx*2))
+        new_y = max(0, min(world.grid.shape[1]-1, self.pos[1] + dy*2))
         
         if world.grid[new_x, new_y] in [POND, POND2]:
             self.state = BeeState.RETURNING
@@ -164,10 +156,10 @@ class Bee:
     def return_to_hive(self, hive):
         dx = np.sign(hive.hive_pos[0] - self.pos[0])
         dy = np.sign(hive.hive_pos[1] - self.pos[1])
-        new_x = self.pos[0] + dx * 2
-        new_y = self.pos[1] + dy * 2
+        new_x = self.pos[0] + dx*3
+        new_y = self.pos[1] + dy*3
         
-        if np.linalg.norm(np.array([new_x, new_y]) - np.array(hive.hive_pos)) < 10:
+        if np.linalg.norm(np.array([new_x, new_y]) - np.array(hive.hive_pos)) < 15:
             self.deposit_nectar(hive)
             self.state = BeeState.IN_HIVE
             self.carrying_nectar = False
@@ -179,33 +171,32 @@ class Bee:
     
     def deposit_nectar(self, hive):
         if self.carrying_nectar:
-            hive.add_honey(1)
+            hive.add_honey(3)
             self.carrying_nectar = False
 
 config = SimulationConfig()
 
 def initialize_simulation():
     world = World(config.world_size)
-    world.add_barrier((40, 60, 10, 20), POND)
-    world.add_barrier((10, 30, 50, 60), POND2)
-    
-    for x in range(10, 30, 3):
-        world.add_tree((x, x+2, 5, 15))
+    world.add_barrier((35, 65, 15, 25), POND)
+    world.add_barrier((10, 30, 55, 65), POND2)
     
     for x in range(60, 90, 2):
-        for y in range(50, 70, 2):
+        for y in range(40, 70, 2):
             world.add_flower((x, y))
+    
+    for x in range(10, 30, 4):
+        world.add_tree((x, x+3, 10, 20))
     
     hive = Hive(config.hive_pos)
     
     bees = []
-    spawn_positions = [(random.randint(0, config.world_size[0]-1), 
-                      random.randint(0, config.world_size[1]-1)) 
+    spawn_positions = [(random.randint(30, 70), random.randint(30, 50)) 
                      for _ in range(config.initial_bees)]
     
     roles = [BeeType.QUEEN] + \
-            [BeeType.DRONE] * int(0.2 * (config.initial_bees-1)) + \
-            [BeeType.WORKER] * (config.initial_bees - 1 - int(0.2 * (config.initial_bees-1)))
+            [BeeType.DRONE] * int(0.1 * (config.initial_bees-1)) + \
+            [BeeType.WORKER] * (config.initial_bees - 1 - int(0.1 * (config.initial_bees-1)))
     
     for i, (pos, role) in enumerate(zip(spawn_positions, roles)):
         bees.append(Bee(f"{role.name[0]}{i+1}", pos, role))
@@ -214,17 +205,17 @@ def initialize_simulation():
 
 def plot_hive(ax, hive, bees):
     ax.clear()
-    ax.set_facecolor('#F0E68C')
+    ax.set_facecolor('#F5F5DC')
     
     for hex_data in hive.hexagons:
         x, y, radius = hex_data
         nectar = hive.cell_nectar[(x, y)]
         
         fill_color = (
-            0.9 - nectar/15,
-            0.8 - nectar/20,
-            0.5 - nectar/25,
-            1
+            1.0 - 0.5*(nectar/10),
+            1.0 - 0.7*(nectar/10),
+            0.6 - 0.4*(nectar/10),
+            1.0
         )
         
         hexagon = RegularPolygon(
@@ -233,29 +224,25 @@ def plot_hive(ax, hive, bees):
             radius=radius,
             orientation=np.radians(30),
             facecolor=fill_color,
-            edgecolor='#8B4513',
+            edgecolor='#654321',
             linewidth=2
         )
         ax.add_patch(hexagon)
-        
-        ax.text(x, y, f"{nectar}/10", 
-               ha='center', va='center',
-               fontsize=9, color='white', weight='bold')
     
     for bee in bees:
         if bee.is_in_hive():
             angle = random.uniform(0, 2*np.pi)
-            radius = random.uniform(0, 8)
+            radius = random.uniform(0, 10)
             x = hive.hive_pos[0] + radius * np.cos(angle)
             y = hive.hive_pos[1] + radius * np.sin(angle)
             
-            color = "red" if bee.type == BeeType.QUEEN else \
-                   "blue" if bee.type == BeeType.DRONE else "yellow"
+            color = "#FF4500" if bee.type == BeeType.QUEEN else \
+                    "#4169E1" if bee.type == BeeType.DRONE else "#FFD700"
             
-            ax.scatter(x, y, c=color, s=120, edgecolors='black', zorder=10)
+            ax.scatter(x, y, c=color, s=150, edgecolors='black', zorder=10)
     
-    ax.set_xlim(hive.hive_pos[0] - 30, hive.hive_pos[0] + 30)
-    ax.set_ylim(hive.hive_pos[1] - 30, hive.hive_pos[1] + 30)
+    ax.set_xlim(hive.hive_pos[0] - 40, hive.hive_pos[0] + 40)
+    ax.set_ylim(hive.hive_pos[1] - 40, hive.hive_pos[1] + 40)
     ax.set_aspect('equal')
     ax.set_title(f"Honey Storage: {hive.honey_stored}", pad=20)
     ax.set_xticks([])
@@ -265,23 +252,23 @@ def plot_world(ax, world, bees):
     ax.clear()
     cmap = plt.cm.get_cmap('tab20', 20)
     colors = cmap(np.arange(20))
-    colors[FLOWER] = [0.2, 0.8, 0.2, 1]
-    colors[DEPLETED_FLOWER] = [0.5, 0.5, 0.5, 1]
-    colors[TREE] = [0.1, 0.4, 0.1, 1]
-    colors[GRASS] = [0.8, 1, 0.8, 1]
-    colors[POND] = [0.2, 0.2, 1, 1]
+    colors[FLOWER] = [0.3, 0.9, 0.3, 1]
+    colors[DEPLETED_FLOWER] = [0.6, 0.6, 0.6, 1]
+    colors[TREE] = [0.1, 0.5, 0.1, 1]
+    colors[GRASS] = [0.85, 1.0, 0.85, 1]
+    colors[POND] = [0.2, 0.2, 0.9, 1]
     colors[POND2] = [0.1, 0.1, 0.8, 1]
-    colors[BUILDING] = [0.3, 0.3, 0.3, 1]
+    colors[BUILDING] = [0.4, 0.4, 0.4, 1]
     
     ax.imshow(world.grid.T, origin="lower", cmap=plt.cm.colors.ListedColormap(colors))
     
     for bee in bees:
         if not bee.is_in_hive():
             x, y = bee.get_pos()
-            color = "red" if bee.type == BeeType.QUEEN else \
-                   "blue" if bee.type == BeeType.DRONE else \
-                   "orange" if bee.carrying_nectar else "yellow"
-            ax.scatter(x, y, c=color, s=100, edgecolors='black', zorder=10)
+            color = "#FF4500" if bee.type == BeeType.QUEEN else \
+                    "#4169E1" if bee.type == BeeType.DRONE else \
+                    "#FFA500" if bee.carrying_nectar else "#FFD700"
+            ax.scatter(x, y, c=color, s=120, edgecolors='black', zorder=10)
     
     ax.set_title("Field View", pad=20)
     ax.set_xlabel("X Coordinate")
@@ -289,29 +276,31 @@ def plot_world(ax, world, bees):
 
 def run_simulation(world, hive, bees):
     plt.ion()
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
-    plt.subplots_adjust(wspace=0.3)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
+    plt.subplots_adjust(wspace=0.25)
     
     for timestep in range(config.max_steps):
         for bee in bees:
             bee.step_change(world, hive)
             
-            if bee.is_in_hive() and random.random() < 0.15:
+            if bee.is_in_hive() and random.random() < 0.2:
                 others = [b for b in bees if b != bee and b.is_in_hive()]
                 if others:
                     bee.communicate_nectar_locations(random.choice(others))
         
         plot_hive(ax1, hive, bees)
         plot_world(ax2, world, bees)
-        fig.suptitle(f"Bee Simulation - Timestep {timestep + 1}/{config.max_steps}", y=0.95)
-        plt.pause(0.1)
+        fig.suptitle(f"Bee Colony Simulation - Timestep {timestep + 1}/{config.max_steps}", 
+                    fontsize=16, y=0.97)
+        plt.pause(0.08)
     
     plt.ioff()
     plt.show()
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Hexagonal Hive Bee Simulation")
-    parser.add_argument("-i", "--interactive", action="store_true", help="Enable interactive mode")
+    parser = argparse.ArgumentParser(description="Enhanced Bee Simulation")
+    parser.add_argument("-i", "--interactive", action="store_true", 
+                       help="Enable interactive visualization mode")
     return parser.parse_args()
 
 if __name__ == "__main__":

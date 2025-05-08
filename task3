@@ -4,6 +4,24 @@ import random
 from buzzness import Bee
 import time
 
+# Extend the Bee class if needed methods aren't available
+class ExtendedBee(Bee):
+    def __init__(self, name, pos, inhive=True):
+        super().__init__(name, pos)
+        self._inhive = inhive
+    
+    def set_pos(self, pos):
+        self._pos = pos
+    
+    def set_inhive(self, inhive):
+        self._inhive = inhive
+    
+    def get_inhive(self):
+        # If the original Bee class doesn't have get_inhive, implement it
+        if hasattr(super(), "get_inhive"):
+            return super().get_inhive()
+        return self._inhive
+
 def plot_hive(hive, blist, ax):
     """Plot the hive and bees"""
     xvalues = [b.get_pos()[0] for b in blist if b.get_inhive()]
@@ -99,7 +117,7 @@ blist = []
 # Create five bees and append them to the blist
 for i in range(5):
     # Create bees with random positions within the hive dimensions
-    bee = Bee(f"b{i}", (random.randint(0, hiveX-1), random.randint(0, hiveY-1)))
+    bee = ExtendedBee(f"b{i}", (random.randint(0, hiveX-1), random.randint(0, hiveY-1)), inhive=True)
     blist.append(bee)
 
 # Initialize the hive - this is a 2D array

@@ -308,13 +308,4 @@ def parse_arguments():
 if __name__ == "__main__":
     args = parse_arguments()
     world, hive, bees = initialize_simulation()
-    run_simulation(world, hive, bees)rse_arguments():
-    parser = argparse.ArgumentParser(description="Enhanced Bee Simulation")
-    parser.add_argument("-i", "--interactive", action="store_true", 
-                       help="Enable interactive visualization mode")
-    return parser.parse_args()
-
-if __name__ == "__main__":
-    args = parse_arguments()
-    world, hive, bees = initialize_simulation()
     run_simulation(world, hive, bees)

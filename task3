@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 from buzzness import Bee
+import time
 
 def plot_hive(hive, blist, ax):
     """Plot the hive and bees"""
@@ -29,6 +30,60 @@ def plot_world(world, hive_pos, ax):
     ax.set_xlabel("X Coordinate")
     ax.set_ylabel("Y Coordinate")
     ax.set_title("Bee World Environment")
+
+def update_bee_positions(blist, hive, world, hive_position, hiveX, hiveY, worldX, worldY):
+    """Update bee positions based on simple movement rules"""
+    for bee in blist:
+        # 20% chance a bee will leave/enter the hive
+        if random.random() < 0.2:
+            bee.set_inhive(not bee.get_inhive())
+            
+            # If leaving hive, set position to hive entrance in world coordinates
+            if not bee.get_inhive():
+                # Set bee position to somewhere near the hive in world coordinates
+                world_x = hive_position[0] + random.randint(-2, 2)
+                world_y = hive_position[1] + random.randint(-2, 2)
+                # Keep within world boundaries
+                world_x = max(0, min(worldX-1, world_x))
+                world_y = max(0, min(worldY-1, world_y))
+                bee.set_pos((world_x, world_y))
+            else:
+                # If entering hive, set position to somewhere in the hive
+                hive_x = random.randint(0, hiveX-1)
+                hive_y = random.randint(0, hiveY-1)
+                bee.set_pos((hive_x, hive_y))
+        
+        # Move bees that are outside the hive
+        if not bee.get_inhive():
+            # Get current position
+            x, y = bee.get_pos()
+            
+            # Bees are attracted to flower patches (value 13)
+            # Check nearby cells for flowers (simplified)
+            nearby_flower = False
+            for dx in range(-3, 4):
+                for dy in range(-3, 4):
+                    nx, ny = x + dx, y + dy
+                    if (0 <= nx < worldX and 0 <= ny < worldY and 
+                        world[nx, ny] == 13):
+                        nearby_flower = True
+                        # Move toward flower
+                        x += np.sign(dx) * random.randint(0, 1)
+                        y += np.sign(dy) * random.randint(0, 1)
+                        break
+                if nearby_flower:
+                    break
+            
+            # If no flowers nearby, random movement
+            if not nearby_flower:
+                x += random.randint(-1, 1)
+                y += random.randint(-1, 1)
+            
+            # Keep within world boundaries
+            x = max(0, min(worldX-1, x))
+            y = max(0, min(worldY-1, y))
+            
+            bee.set_pos((x, y))
 
 # Define hive dimensions
 hiveX = 30
@@ -88,33 +143,47 @@ world[20:26, 24:30] = 13  # Flower patch 2
 # 17-19: Rocky areas
 world[36:40, 20:40] = 17  # Rocky area at top right
 
-# Create subplots to show the bees, hive, and world
+# Set up figure for animation
+plt.ion()  # Turn on interactive mode
 fig, axs = plt.subplots(1, 2, figsize=(15, 6))
-
-# Plot the hive in the first subplot
-plot_hive(hive, blist, axs[0])
-
-# Plot the world in the second subplot with the hive position
-plot_world(world, hive_position, axs[1])
-
-# Plot the bees on the world - convert to world coordinates
-for bee in blist:
-    # Convert bee positions to world coordinates for visualization
-    if bee.get_inhive():
-        # This is just for visualization in the world plot
-        world_x = hive_position[0] + (bee.get_pos()[0] - hiveX//2) // 2
-        world_y = hive_position[1] + (bee.get_pos()[1] - hiveY//2) // 2
-        # Keep within world boundaries
-        world_x = max(0, min(worldX-1, world_x))
-        world_y = max(0, min(worldY-1, world_y))
-        axs[1].scatter(world_x, world_y, c='yellow', s=100, edgecolors='black')
-
-# Add supertitle
 fig.suptitle("Complete Bee World Simulation", fontsize=16)
 
-# Save the figure
-fig.tight_layout(rect=[0, 0, 1, 0.95])  # Adjust layout to make room for suptitle
-fig.savefig("task3.png")
+# Run simulation for 10 timesteps
+for timestep in range(10):
+    # Clear previous plots
+    for ax in axs:
+        ax.clear()
+    
+    # Update bee positions
+    update_bee_positions(blist, hive, world, hive_position, hiveX, hiveY, worldX, worldY)
+    
+    # Plot the hive in the first subplot
+    plot_hive(hive, blist, axs[0])
+    
+    # Plot the world in the second subplot with the hive position
+    plot_world(world, hive_position, axs[1])
+    
+    # Plot the bees on the world
+    for bee in blist:
+        if bee.get_inhive():
+            # For visualization, show bees in the hive
+            axs[0].scatter(bee.get_pos()[0], bee.get_pos()[1], c='yellow', s=100, edgecolors='black')
+        else:
+            # Show bees in the world
+            world_x, world_y = bee.get_pos()
+            axs[1].scatter(world_x, world_y, c='yellow', s=100, edgecolors='black')
+    
+    # Update timestep in title
+    fig.suptitle(f"Complete Bee World Simulation - Timestep {timestep+1}/10", fontsize=16)
+    
+    # Adjust layout and draw
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.draw()
+    plt.pause(0.5)  # Pause to allow the animation to be visible
+    
+    # Save the figure for each timestep
+    fig.savefig(f"bee_simulation_timestep_{timestep+1}.png")
 
-# Show the plot
+# Turn off interactive mode when done
+plt.ioff()
 plt.show()

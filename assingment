@@ -1,0 +1,150 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+
+# Base Bee class
+class Bee:
+    def __init__(self, ID, pos):
+        self.ID = ID
+        self.pos = pos
+        self.in_hive = False  # All bees start in the world
+        self.is_queen = False
+
+    def get_pos(self):
+        return self.pos
+
+    def get_inhive(self):
+        return self.in_hive
+
+    def set_inhive(self, value):
+        self.in_hive = value
+
+# Configuration
+hiveX, hiveY = 30, 25
+worldX, worldY = 45, 40
+hive_pos = (14, 20)
+
+# Terrain constants
+GRASS = 5
+POND = 0
+POND2 = 14
+FLOWER = 12
+TREE = 4
+
+# Initialize hive: all empty, 6 buildable slots only
+hive = np.ones((hiveX, hiveY)) * 10
+buildable_cells = [(14, 8), (14, 10), (14, 12), (14, 14), (14, 16), (14, 18)]
+for x, y in buildable_cells:
+    hive[x, y] = 5  # buildable placeholder
+
+# Initialize world
+world = np.ones((worldX, worldY), dtype=int) * GRASS
+world[30:40, 5:10] = POND
+world[5:10, 30:35] = POND2
+for x in range(0, 10, 2):
+    world[x:x + 1, 1:4] = TREE
+for x in range(24, 45, 2):
+    for y in range(20, 40, 2):
+        world[x:x + 1, y:y + 1] = FLOWER
+
+# Hive cell tracker
+hive_cells_built = 0
+required_hive_cells = 6
+
+# Bee behavior
+class BeeTask4(Bee):
+    def __init__(self, ID, pos, gender="female"):
+        super().__init__(ID, pos)
+        self.gender = gender
+        self.is_queen = gender == "queen"
+        self.carrying_nectar = False
+
+    def step_change(self):
+        global hive_cells_built
+
+        if self.in_hive:
+            # Bees stay in hive once returned
+            return
+
+        # If carrying nectar, head toward hive
+        if self.carrying_nectar:
+            dx = np.sign(hive_pos[0] - self.pos[0])
+            dy = np.sign(hive_pos[1] - self.pos[1])
+            new_x = max(0, min(worldX - 1, self.pos[0] + dx))
+            new_y = max(0, min(worldY - 1, self.pos[1] + dy))
+            self.pos = (new_x, new_y)
+
+            if self.pos == hive_pos:
+                self.set_inhive(True)
+                self.deposit_nectar()
+        else:
+            # Random walk
+            validmoves = [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1),
+                          (1, 1), (-1, -1), (1, -1), (-1, 1)]
+            move = random.choice(validmoves)
+            new_x = max(0, min(worldX - 1, self.pos[0] + move[0]))
+            new_y = max(0, min(worldY - 1, self.pos[1] + move[1]))
+            self.pos = (new_x, new_y)
+
+            # Collect nectar
+            if world[self.pos[0], self.pos[1]] == FLOWER:
+                self.carrying_nectar = True
+
+    def deposit_nectar(self):
+        global hive_cells_built
+        for dx, dy in buildable_cells:
+            if hive[dx, dy] == 5:
+                hive[dx, dy] = 1  # build cell
+                hive_cells_built += 1
+                self.carrying_nectar = False
+                return
+
+# Create bees: 1 queen, 5 drones, 4 workers
+blist = []
+spawn_positions = [(random.randint(0, worldX-1), random.randint(0, worldY-1)) for _ in range(10)]
+roles = ["queen"] + ["drone"] * 5 + ["female"] * 4
+
+for i, (pos, role) in enumerate(zip(spawn_positions, roles)):
+    bee = BeeTask4(f"{role[0]}{i+1}", pos, gender=role)
+    blist.append(bee)
+
+# Visualization setup
+plt.ion()
+fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+def plot_hive():
+    axes[0].clear()
+    axes[0].imshow(hive.T, origin="lower", cmap="YlOrBr", vmin=0, vmax=10)
+    for b in blist:
+        if b.get_inhive():
+            x, y = b.get_pos()
+            color = "red" if b.is_queen else ("blue" if b.gender == "drone" else "orange" if b.carrying_nectar else "yellow")
+            axes[0].scatter(x, y, c=color, s=100, edgecolors='black')
+    axes[0].set_title("Bee Hive")
+    axes[0].set_xlabel("position X")
+    axes[0].set_ylabel("position Y")
+
+def plot_world():
+    axes[1].clear()
+    axes[1].imshow(world.T, origin="lower", cmap="tab20", vmin=0, vmax=19)
+    for b in blist:
+        if not b.get_inhive():
+            x, y = b.get_pos()
+            color = "red" if b.is_queen else ("blue" if b.gender == "drone" else "orange" if b.carrying_nectar else "yellow")
+            axes[1].scatter(x, y, c=color, s=100, edgecolors='black')
+    axes[1].set_title("Bee World")
+    axes[1].set_xlabel("position X")
+    axes[1].set_ylabel("position Y")
+
+# Run simulation: limited to 10 time steps
+for timestep in range(10):
+    for b in blist:
+        b.step_change()
+
+    plot_hive()
+    plot_world()
+    fig.suptitle(f"Timestep {timestep + 1} | Hive Cells Built: {hive_cells_built}", fontsize=14)
+    plt.pause(0.5)
+
+plt.ioff()
+plt.show()

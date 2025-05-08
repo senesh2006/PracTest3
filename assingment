@@ -63,7 +63,7 @@ class World:
 
 class Hive:
     def __init__(self, hive_pos):
-        self.hive_pos = hive_pos
+        self.hive_pos = (int(hive_pos[0]), int(hive_pos[1]))
         self.honey_stored = 0
         self.hexagons = []
         self.cell_nectar = {}
@@ -73,22 +73,24 @@ class Hive:
         
         for side in [-1, 1]:
             for i in range(3):
-                x = hive_pos[0] + side * hex_radius * 2
-                y = hive_pos[1] + (i - 1) * vertical_spacing
-                self.hexagons.append((x, y, hex_radius))
-                self.cell_nectar[(x, y)] = 0
+                x = self.hive_pos[0] + side * hex_radius * 2
+                y = self.hive_pos[1] + (i - 1) * vertical_spacing
+                x_int, y_int = int(round(x)), int(round(y))
+                self.hexagons.append((x_int, y_int, hex_radius))
+                self.cell_nectar[(x_int, y_int)] = 0
 
     def add_honey(self, amount):
         self.honey_stored += amount
         for pos in self.hexagons:
-            if self.cell_nectar[pos] < 10:
-                self.cell_nectar[pos] = min(10, self.cell_nectar[pos] + amount)
+            x, y, r = pos
+            if self.cell_nectar[(x, y)] < 10:
+                self.cell_nectar[(x, y)] = min(10, self.cell_nectar[(x, y)] + amount)
                 break
 
 class Bee:
     def __init__(self, bee_id, pos, bee_type):
         self.id = bee_id
-        self.pos = pos
+        self.pos = (int(pos[0]), int(pos[1]))
         self.type = bee_type
         self.state = BeeState.IN_HIVE
         self.carrying_nectar = False
@@ -159,14 +161,14 @@ class Bee:
         new_x = self.pos[0] + dx*3
         new_y = self.pos[1] + dy*3
         
-        if np.linalg.norm(np.array([new_x, new_y]) - np.array(hive.hive_pos)) < 15:
+        if np.linalg.norm(np.array([int(new_x), int(new_y)] - np.array(hive.hive_pos)) < 15:
             self.deposit_nectar(hive)
             self.state = BeeState.IN_HIVE
             self.carrying_nectar = False
         else:
             self.pos = (
-                max(0, min(config.world_size[0]-1, new_x)),
-                max(0, min(config.world_size[1]-1, new_y))
+                max(0, min(config.world_size[0]-1, int(new_x))),
+                max(0, min(config.world_size[1]-1, int(new_y)))
             )
     
     def deposit_nectar(self, hive):
@@ -298,6 +300,15 @@ def run_simulation(world, hive, bees):
     plt.show()
 
 def parse_arguments():
+    parser = argparse.ArgumentParser(description="Enhanced Bee Simulation")
+    parser.add_argument("-i", "--interactive", action="store_true", 
+                       help="Enable interactive visualization mode")
+    return parser.parse_args()
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    world, hive, bees = initialize_simulation()
+    run_simulation(world, hive, bees)rse_arguments():
     parser = argparse.ArgumentParser(description="Enhanced Bee Simulation")
     parser.add_argument("-i", "--interactive", action="store_true", 
                        help="Enable interactive visualization mode")

@@ -1,224 +1,128 @@
-import pygame
 import random
-import math
+import time
+from enum import Enum
 
-# Initialize pygame
-pygame.init()
+class FlowerStatus(Enum):
+    FRESH = 1
+    DEPLETED = 2
 
-# Screen dimensions
-WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Bee Ecosystem Simulation - Inspired by First Nations Water Knowledge")
-
-# Colors
-SKY_BLUE = (135, 206, 235)
-EARTH_BROWN = (139, 69, 19)
-WATER_BLUE = (64, 164, 223)
-HIVE_YELLOW = (244, 196, 48)
-FLOWER_COLORS = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
-DEPLETED_FLOWER = (200, 200, 200)  # Gray color for depleted flowers
-BEE_YELLOW = (255, 255, 0)
-BLACK = (0, 0, 0)
-
-# Game parameters
-FPS = 60
-clock = pygame.time.Clock()
+class BeeActivity(Enum):
+    EXPLORING = 1
+    COLLECTING = 2
+    RETURNING = 3
+    RECOVERING = 4
 
 class Flower:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.radius = 10
-        self.color = random.choice(FLOWER_COLORS)
-        self.has_nectar = True
-        self.original_color = self.color
-        
-    def draw(self):
-        pygame.draw.circle(screen, self.color, (self.x, self.y), self.radius)
-        pygame.draw.circle(screen, BLACK, (self.x, self.y), self.radius, 1)
-        
-    def deplete(self):
-        self.has_nectar = False
-        self.color = DEPLETED_FLOWER
-        
+    def __init__(self, id, color):
+        self.id = id
+        self.original_color = color
+        self.current_color = color
+        self.status = FlowerStatus.FRESH
+        self.nectar = random.randint(3, 6)
+    
+    def collect_nectar(self):
+        if self.status == FlowerStatus.FRESH:
+            self.nectar -= 1
+            if self.nectar <= 0:
+                self.status = FlowerStatus.DEPLETED
+                self.current_color = "gray"
+            return True
+        return False
+    
     def replenish(self):
-        self.has_nectar = True
-        self.color = self.original_color
-
-class WaterSource:
-    def __init__(self, x, y, width, height):
-        self.rect = pygame.Rect(x, y, width, height)
-        
-    def draw(self):
-        pygame.draw.rect(screen, WATER_BLUE, self.rect)
-        pygame.draw.rect(screen, BLACK, self.rect, 1)
+        if random.random() < 0.2:  # 20% chance to replenish each check
+            self.status = FlowerStatus.FRESH
+            self.nectar = random.randint(3, 6)
+            self.current_color = self.original_color
+            return True
+        return False
 
 class Bee:
-    def __init__(self, x, y, hive):
-        self.x = x
-        self.y = y
+    def __init__(self, id, hive):
+        self.id = id
         self.hive = hive
+        self.activity = BeeActivity.EXPLORING
         self.target = None
-        self.speed = 2
         self.nectar = 0
         self.max_nectar = 5
-        self.returning_to_hive = False
-        self.in_water = False
-        self.water_recovery_time = 0
-        
-    def move(self):
-        if self.water_recovery_time > 0:
-            self.water_recovery_time -= 1
-            if self.water_recovery_time == 0:
-                self.in_water = False
+        self.recovery_time = 0
+    
+    def update(self, flowers, water_sources):
+        if self.recovery_time > 0:
+            self.recovery_time -= 1
+            if self.recovery_time == 0:
+                self.activity = BeeActivity.EXPLORING
             return
-            
-        if self.returning_to_hive:
-            # Move toward hive
-            dx = self.hive.x - self.x
-            dy = self.hive.y - self.y
-            dist = max(1, math.sqrt(dx*dx + dy*dy))
-            dx, dy = dx/dist, dy/dist
-            self.x += dx * self.speed
-            self.y += dy * self.speed
-            
-            # Check if reached hive
-            if math.sqrt((self.hive.x-self.x)**2 + (self.hive.y-self.y)**2) < 20:
-                self.returning_to_hive = False
-                self.nectar = 0
-        elif self.target:
-            # Move toward target
-            if isinstance(self.target, Flower) and not self.target.has_nectar:
-                self.target = None
-                return
-                
-            dx = self.target.x - self.x
-            dy = self.target.y - self.y
-            dist = max(1, math.sqrt(dx*dx + dy*dy))
-            dx, dy = dx/dist, dy/dist
-            self.x += dx * self.speed
-            self.y += dy * self.speed
-            
-            # Check if reached target
-            if isinstance(self.target, Flower):
-                if dist < self.target.radius + 5:
-                    if self.target.has_nectar:
-                        self.nectar += 1
-                        self.target.deplete()
-                        self.returning_to_hive = True
-            elif isinstance(self.target, WaterSource):
-                if self.target.rect.collidepoint(self.x, self.y):
-                    self.in_water = True
-                    self.water_recovery_time = FPS * 2  # 2 seconds to recover
-                    self.returning_to_hive = True
-        else:
-            # Random wandering
-            self.x += random.uniform(-self.speed, self.speed)
-            self.y += random.uniform(-self.speed, self.speed)
-            
-            # Keep within bounds
-            self.x = max(0, min(WIDTH, self.x))
-            self.y = max(0, min(HEIGHT, self.y))
-            
-    def draw(self):
-        pygame.draw.circle(screen, BEE_YELLOW, (int(self.x), int(self.y)), 5)
-        pygame.draw.circle(screen, BLACK, (int(self.x), int(self.y)), 5, 1)
         
-        # Draw nectar indicator
-        if self.nectar > 0:
-            pygame.draw.rect(screen, (139, 69, 19), (self.x-5, self.y-10, 10, 2))
-            pygame.draw.rect(screen, (255, 215, 0), (self.x-5, self.y-10, 10 * (self.nectar/self.max_nectar), 2))
+        if self.activity == BeeActivity.EXPLORING:
+            # 15% chance to encounter water (like in Daly River ecosystem)
+            if random.random() < 0.15 and water_sources:
+                self.target = random.choice(water_sources)
+                self.activity = BeeActivity.COLLECTING
+            else:
+                # Find a fresh flower
+                fresh_flowers = [f for f in flowers if f.status == FlowerStatus.FRESH]
+                if fresh_flowers:
+                    self.target = random.choice(fresh_flowers)
+                    self.activity = BeeActivity.COLLECTING
+        
+        elif self.activity == BeeActivity.COLLECTING:
+            if isinstance(self.target, Flower):
+                if self.target.collect_nectar():
+                    self.nectar += 1
+                    print(f"Bee {self.id} collected nectar from flower {self.target.id} (color: {self.target.current_color})")
+                    if self.nectar >= self.max_nectar:
+                        self.activity = BeeActivity.RETURNING
+                else:
+                    print(f"Bee {self.id} found flower {self.target.id} depleted (color: {self.target.current_color})")
+                    self.activity = BeeActivity.EXPLORING
+                    self.target = None
+            elif isinstance(self.target, str):  # Water source
+                print(f"Bee {self.id} encountered water at {self.target}! Returning to hive.")
+                self.activity = BeeActivity.RETURNING
+                self.recovery_time = 3  # Recovery period after water encounter
+        
+        elif self.activity == BeeActivity.RETURNING:
+            self.hive.honey += self.nectar
+            print(f"Bee {self.id} returned to hive with {self.nectar} nectar. Total honey: {self.hive.honey}")
+            self.nectar = 0
+            self.activity = BeeActivity.EXPLORING
+            self.target = None
 
 class Hive:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.radius = 20
+    def __init__(self):
         self.honey = 0
-        
-    def draw(self):
-        pygame.draw.circle(screen, HIVE_YELLOW, (self.x, self.y), self.radius)
-        pygame.draw.circle(screen, BLACK, (self.x, self.y), self.radius, 2)
-        
-        # Draw honey indicator
-        pygame.draw.rect(screen, (139, 69, 19), (self.x-25, self.y+30, 50, 5))
-        pygame.draw.rect(screen, (255, 215, 0), (self.x-25, self.y+30, 50 * min(1, self.honey/100), 5))
 
-def main():
-    # Create objects
-    hive = Hive(WIDTH//2, HEIGHT//2)
-    bees = [Bee(WIDTH//2, HEIGHT//2, hive) for _ in range(5)]
-    flowers = [Flower(random.randint(50, WIDTH-50), random.randint(50, HEIGHT-50)) for _ in range(15)]
-    water = WaterSource(100, 100, 200, 50)
+def simulate_ecosystem(duration=60):
+    # Initialize ecosystem
+    hive = Hive()
+    bees = [Bee(i, hive) for i in range(1, 6)]
+    flowers = [Flower(i, random.choice(["red", "blue", "yellow", "purple"])) for i in range(1, 11)]
+    water_sources = ["Daly River", "Billabong", "Creek"]
     
-    # Main game loop
-    running = True
-    while running:
-        clock.tick(FPS)
+    print("Starting ecosystem simulation (inspired by First Nations water knowledge)")
+    print(f"Initial state: {len(bees)} bees, {len(flowers)} flowers, {len(water_sources)} water sources")
+    
+    for tick in range(1, duration + 1):
+        print(f"\n--- Time period {tick} ---")
         
-        # Handle events
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
-                elif event.key == pygame.K_r:
-                    # Replenish all flowers
-                    for flower in flowers:
-                        flower.replenish()
-        
-        # Update bees
-        for bee in bees:
-            # Find new target if needed
-            if not bee.target and not bee.returning_to_hive and not bee.in_water:
-                # 10% chance to check for water (like in the Daly River ecosystem)
-                if random.random() < 0.1:
-                    bee.target = water
-                else:
-                    # Find a flower with nectar
-                    available_flowers = [f for f in flowers if f.has_nectar]
-                    if available_flowers:
-                        bee.target = random.choice(available_flowers)
-            
-            bee.move()
-            
-            # If bee delivered nectar to hive
-            if not bee.returning_to_hive and bee.nectar == 0 and bee.target is None:
-                hive.honey += 1
-        
-        # Occasionally replenish flowers (like seasonal cycles in Ngan'gi calendar)
-        if random.random() < 0.01:
-            for flower in flowers:
-                if random.random() < 0.3:  # 30% chance to replenish each depleted flower
-                    flower.replenish()
-        
-        # Draw everything
-        screen.fill(SKY_BLUE)
-        
-        # Draw ground
-        pygame.draw.rect(screen, EARTH_BROWN, (0, HEIGHT-50, WIDTH, 50))
-        
-        water.draw()
-        hive.draw()
-        
+        # Update all flowers (seasonal replenishment)
         for flower in flowers:
-            flower.draw()
-            
+            if flower.status == FlowerStatus.DEPLETED:
+                if flower.replenish():
+                    print(f"Flower {flower.id} replenished to color {flower.current_color}")
+        
+        # Update all bees
         for bee in bees:
-            bee.draw()
+            bee.update(flowers, water_sources)
         
-        # Draw instructions
-        font = pygame.font.SysFont(None, 24)
-        text = font.render("Press R to replenish flowers (simulate seasonal change)", True, BLACK)
-        screen.blit(text, (10, 10))
-        
-        text = font.render(f"Honey: {hive.honey}", True, BLACK)
-        screen.blit(text, (WIDTH-150, 10))
-        
-        pygame.display.flip()
+        time.sleep(1)  # Pause between time periods
     
-    pygame.quit()
+    print("\nSimulation complete!")
+    print(f"Final hive honey: {hive.honey}")
+    print("Flower states:")
+    for flower in flowers:
+        print(f"Flower {flower.id}: color {flower.current_color}, nectar {flower.nectar}/5")
 
 if __name__ == "__main__":
-    main()
+    simulate_ecosystem()

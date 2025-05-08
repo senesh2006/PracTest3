@@ -1,28 +1,166 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import random
+import argparse
+from enum import Enum, auto
 
-# Base Bee class
+# Enums for better state management
+class BeeState(Enum):
+    IN_HIVE = auto()
+    SEEKING_NECTAR = auto()
+    RETURNING = auto()
+    COMMUNICATING = auto()
+
+class BeeType(Enum):
+    QUEEN = auto()
+    WORKER = auto()
+    DRONE = auto()
+
+# Configuration class for better parameter management
+class SimulationConfig:
+    def __init__(self):
+        self.hive_size = (30, 25)
+        self.world_size = (45, 40)
+        self.hive_pos = (14, 20)
+        self.max_steps = 100
+        self.initial_bees = 10
+        self.communication_range = 3
+        self.nectar_capacity = 5
+
+# Base Bee class with enhanced functionality
 class Bee:
-    def __init__(self, ID, pos):
-        self.ID = ID
+    def __init__(self, bee_id, pos, bee_type):
+        self.id = bee_id
         self.pos = pos
-        self.in_hive = False  # All bees start in the world
-        self.is_queen = False
-
+        self.type = bee_type
+        self.state = BeeState.IN_HIVE
+        self.carrying_nectar = False
+        self.nectar_locations = []  # Known flower locations
+        self.current_mission_target = None
+        self.steps_in_hive = 0
+        
     def get_pos(self):
         return self.pos
+    
+    def is_in_hive(self):
+        return self.state == BeeState.IN_HIVE
+    
+    def start_mission(self):
+        if self.state == BeeState.IN_HIVE:
+            self.state = BeeState.SEEKING_NECTAR
+            self.steps_in_hive = 0
+            return True
+        return False
+    
+    def communicate_nectar_locations(self, other_bee):
+        if self.state == BeeState.IN_HIVE and other_bee.state == BeeState.IN_HIVE:
+            # Share known nectar locations within communication range
+            shared_locations = [loc for loc in self.nectar_locations 
+                              if np.linalg.norm(np.array(loc) - np.array(self.pos)) <= config.communication_range]
+            other_bee.nectar_locations.extend(shared_locations)
+            other_bee.nectar_locations = list(set(other_bee.nectar_locations))  # Remove duplicates
+    
+    def step_change(self, world, hive):
+        if self.state == BeeState.IN_HIVE:
+            self.steps_in_hive += 1
+            # Random chance to start new mission
+            if random.random() < 0.1 and self.steps_in_hive > 2:
+                self.start_mission()
+        
+        elif self.state == BeeState.SEEKING_NECTAR:
+            self.move_to_nectar(world)
+            
+        elif self.state == BeeState.RETURNING:
+            self.return_to_hive(hive)
+    
+    def move_to_nectar(self, world):
+        # Implement movement logic to find nectar
+        if self.current_mission_target:
+            # Move toward known target
+            dx = np.sign(self.current_mission_target[0] - self.pos[0])
+            dy = np.sign(self.current_mission_target[1] - self.pos[1])
+        else:
+            # Random walk or explore
+            dx, dy = random.choice([(0,1),(1,0),(0,-1),(-1,0),(1,1),(-1,-1),(1,-1),(-1,1)])
+        
+        new_x = max(0, min(world.shape[0]-1, self.pos[0] + dx))
+        new_y = max(0, min(world.shape[1]-1, self.pos[1] + dy))
+        
+        # Check if new position is valid (not water/building)
+        if world[new_x, new_y] not in [POND, POND2, BUILDING]:
+            self.pos = (new_x, new_y)
+            
+            # Check if found nectar
+            if world[new_x, new_y] in [FLOWER, TREE] and not self.carrying_nectar:
+                self.carrying_nectar = True
+                self.nectar_locations.append((new_x, new_y))
+                self.state = BeeState.RETURNING
+                self.current_mission_target = None
+    
+    def return_to_hive(self, hive):
+        # Move toward hive
+        dx = np.sign(hive.hive_pos[0] - self.pos[0])
+        dy = np.sign(hive.hive_pos[1] - self.pos[1])
+        
+        new_x = max(0, min(hive.size[0]-1, self.pos[0] + dx))
+        new_y = max(0, min(hive.size[1]-1, self.pos[1] + dy))
+        self.pos = (new_x, new_y)
+        
+        # Check if reached hive
+        if self.pos == hive.hive_pos:
+            self.deposit_nectar(hive)
+            self.state = BeeState.IN_HIVE
+            self.carrying_nectar = False
+    
+    def deposit_nectar(self, hive):
+        if self.carrying_nectar:
+            hive.add_honey(1)
+            self.carrying_nectar = False
 
-    def get_inhive(self):
-        return self.in_hive
+# Hive class to manage hive state
+class Hive:
+    def __init__(self, size, hive_pos):
+        self.size = size
+        self.hive_pos = hive_pos
+        self.honey_stored = 0
+        self.cells = np.ones(size) * 10  # Empty cells
+        self.buildable_cells = [(14, 8), (14, 10), (14, 12), 
+                              (14, 14), (14, 16), (14, 18)]
+        for x, y in self.buildable_cells:
+            self.cells[x, y] = 5  # Buildable placeholder
+    
+    def add_honey(self, amount):
+        self.honey_stored += amount
+        # Build new cells if enough honey
+        if self.honey_stored >= 10 and any(self.cells[x,y] == 5 for x,y in self.buildable_cells):
+            for x, y in self.buildable_cells:
+                if self.cells[x, y] == 5:
+                    self.cells[x, y] = 1  # Built cell
+                    self.honey_stored -= 10
+                    break
 
-    def set_inhive(self, value):
-        self.in_hive = value
-
-# Configuration
-hiveX, hiveY = 30, 25
-worldX, worldY = 45, 40
-hive_pos = (14, 20)
+# World class to manage terrain
+class World:
+    def __init__(self, size):
+        self.size = size
+        self.grid = np.ones(size, dtype=int) * GRASS
+        self.flowers = []
+        self.trees = []
+        self.barriers = []
+    
+    def add_flower(self, pos):
+        self.grid[pos[0], pos[1]] = FLOWER
+        self.flowers.append(pos)
+    
+    def add_tree(self, area):
+        x1, x2, y1, y2 = area
+        self.grid[x1:x2, y1:y2] = TREE
+        self.trees.append(area)
+    
+    def add_barrier(self, area, barrier_type):
+        x1, x2, y1, y2 = area
+        self.grid[x1:x2, y1:y2] = barrier_type
+        self.barriers.append((area, barrier_type))
 
 # Terrain constants
 GRASS = 5
@@ -30,121 +168,127 @@ POND = 0
 POND2 = 14
 FLOWER = 12
 TREE = 4
+BUILDING = 8
 
-# Initialize hive: all empty, 6 buildable slots only
-hive = np.ones((hiveX, hiveY)) * 10
-buildable_cells = [(14, 8), (14, 10), (14, 12), (14, 14), (14, 16), (14, 18)]
-for x, y in buildable_cells:
-    hive[x, y] = 5  # buildable placeholder
+# Initialize configuration
+config = SimulationConfig()
 
-# Initialize world
-world = np.ones((worldX, worldY), dtype=int) * GRASS
-world[30:40, 5:10] = POND
-world[5:10, 30:35] = POND2
-for x in range(0, 10, 2):
-    world[x:x + 1, 1:4] = TREE
-for x in range(24, 45, 2):
-    for y in range(20, 40, 2):
-        world[x:x + 1, y:y + 1] = FLOWER
+def initialize_simulation():
+    # Create world
+    world = World(config.world_size)
+    world.add_barrier((30, 40, 5, 10), POND)
+    world.add_barrier((5, 10, 30, 35), POND2)
+    
+    # Add trees
+    for x in range(0, 10, 2):
+        world.add_tree((x, x+1, 1, 4))
+    
+    # Add flowers
+    for x in range(24, 45, 2):
+        for y in range(20, 40, 2):
+            world.add_flower((x, y))
+    
+    # Create hive
+    hive = Hive(config.hive_size, config.hive_pos)
+    
+    # Create bees
+    bees = []
+    spawn_positions = [(random.randint(0, config.world_size[0]-1), 
+                       random.randint(0, config.world_size[1]-1)) 
+                      for _ in range(config.initial_bees)]
+    
+    # Create 1 queen, 20% drones, rest workers
+    roles = [BeeType.QUEEN] + \
+            [BeeType.DRONE] * int(0.2 * (config.initial_bees-1)) + \
+            [BeeType.WORKER] * (config.initial_bees - 1 - int(0.2 * (config.initial_bees-1)))
+    
+    for i, (pos, role) in enumerate(zip(spawn_positions, roles)):
+        bee = Bee(f"{role.name[0]}{i+1}", pos, role)
+        bees.append(bee)
+    
+    return world, hive, bees
 
-# Hive cell tracker
-hive_cells_built = 0
-required_hive_cells = 6
+def run_simulation(world, hive, bees, steps=100):
+    plt.ion()
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    
+    for timestep in range(steps):
+        # Update all bees
+        for bee in bees:
+            bee.step_change(world.grid, hive)
+            
+            # Random communication between bees in hive
+            if bee.is_in_hive() and random.random() < 0.1:
+                other_bees = [b for b in bees if b != bee and b.is_in_hive()]
+                if other_bees:
+                    bee.communicate_nectar_locations(random.choice(other_bees))
+        
+        # Visualization
+        plot_hive(axes[0], hive, bees)
+        plot_world(axes[1], world, bees)
+        fig.suptitle(f"Timestep {timestep + 1} | Honey: {hive.honey_stored}", fontsize=14)
+        plt.pause(0.1)
+    
+    plt.ioff()
+    plt.show()
 
-# Bee behavior
-class BeeTask4(Bee):
-    def __init__(self, ID, pos, gender="female"):
-        super().__init__(ID, pos)
-        self.gender = gender
-        self.is_queen = gender == "queen"
-        self.carrying_nectar = False
+def plot_hive(ax, hive, bees):
+    ax.clear()
+    ax.imshow(hive.cells.T, origin="lower", cmap="YlOrBr", vmin=0, vmax=10)
+    
+    for bee in bees:
+        if bee.is_in_hive():
+            x, y = bee.get_pos()
+            color = "red" if bee.type == BeeType.QUEEN else \
+                   "blue" if bee.type == BeeType.DRONE else "yellow"
+            ax.scatter(x, y, c=color, s=100, edgecolors='black')
+    
+    ax.set_title("Bee Hive")
+    ax.set_xlabel("position X")
+    ax.set_ylabel("position Y")
 
-    def step_change(self):
-        global hive_cells_built
+def plot_world(ax, world, bees):
+    ax.clear()
+    ax.imshow(world.grid.T, origin="lower", cmap="tab20", vmin=0, vmax=19)
+    
+    for bee in bees:
+        if not bee.is_in_hive():
+            x, y = bee.get_pos()
+            color = "red" if bee.type == BeeType.QUEEN else \
+                   "blue" if bee.type == BeeType.DRONE else \
+                   "orange" if bee.carrying_nectar else "yellow"
+            ax.scatter(x, y, c=color, s=100, edgecolors='black')
+    
+    ax.set_title("Bee World")
+    ax.set_xlabel("position X")
+    ax.set_ylabel("position Y")
 
-        if self.in_hive:
-            # Bees stay in hive once returned
-            return
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Bee Simulation")
+    parser.add_argument("-i", "--interactive", action="store_true", 
+                       help="Run in interactive mode")
+    parser.add_argument("-f", "--mapfile", type=str, 
+                       help="Map file for batch mode")
+    parser.add_argument("-p", "--paramfile", type=str, 
+                       help="Parameter file for batch mode")
+    return parser.parse_args()
 
-        # If carrying nectar, head toward hive
-        if self.carrying_nectar:
-            dx = np.sign(hive_pos[0] - self.pos[0])
-            dy = np.sign(hive_pos[1] - self.pos[1])
-            new_x = max(0, min(worldX - 1, self.pos[0] + dx))
-            new_y = max(0, min(worldY - 1, self.pos[1] + dy))
-            self.pos = (new_x, new_y)
+def main():
+    args = parse_arguments()
+    
+    if args.interactive:
+        print("Running in interactive mode")
+        # Here you would prompt for parameters
+        world, hive, bees = initialize_simulation()
+    elif args.mapfile and args.paramfile:
+        print(f"Running in batch mode with map: {args.mapfile} and params: {args.paramfile}")
+        # Here you would load from files
+        world, hive, bees = initialize_simulation()
+    else:
+        print("Running with default configuration")
+        world, hive, bees = initialize_simulation()
+    
+    run_simulation(world, hive, bees, config.max_steps)
 
-            if self.pos == hive_pos:
-                self.set_inhive(True)
-                self.deposit_nectar()
-        else:
-            # Random walk
-            validmoves = [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1),
-                          (1, 1), (-1, -1), (1, -1), (-1, 1)]
-            move = random.choice(validmoves)
-            new_x = max(0, min(worldX - 1, self.pos[0] + move[0]))
-            new_y = max(0, min(worldY - 1, self.pos[1] + move[1]))
-            self.pos = (new_x, new_y)
-
-            # Collect nectar
-            if world[self.pos[0], self.pos[1]] == FLOWER:
-                self.carrying_nectar = True
-
-    def deposit_nectar(self):
-        global hive_cells_built
-        for dx, dy in buildable_cells:
-            if hive[dx, dy] == 5:
-                hive[dx, dy] = 1  # build cell
-                hive_cells_built += 1
-                self.carrying_nectar = False
-                return
-
-# Create bees: 1 queen, 5 drones, 4 workers
-blist = []
-spawn_positions = [(random.randint(0, worldX-1), random.randint(0, worldY-1)) for _ in range(10)]
-roles = ["queen"] + ["drone"] * 5 + ["female"] * 4
-
-for i, (pos, role) in enumerate(zip(spawn_positions, roles)):
-    bee = BeeTask4(f"{role[0]}{i+1}", pos, gender=role)
-    blist.append(bee)
-
-# Visualization setup
-plt.ion()
-fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-
-def plot_hive():
-    axes[0].clear()
-    axes[0].imshow(hive.T, origin="lower", cmap="YlOrBr", vmin=0, vmax=10)
-    for b in blist:
-        if b.get_inhive():
-            x, y = b.get_pos()
-            color = "red" if b.is_queen else ("blue" if b.gender == "drone" else "orange" if b.carrying_nectar else "yellow")
-            axes[0].scatter(x, y, c=color, s=100, edgecolors='black')
-    axes[0].set_title("Bee Hive")
-    axes[0].set_xlabel("position X")
-    axes[0].set_ylabel("position Y")
-
-def plot_world():
-    axes[1].clear()
-    axes[1].imshow(world.T, origin="lower", cmap="tab20", vmin=0, vmax=19)
-    for b in blist:
-        if not b.get_inhive():
-            x, y = b.get_pos()
-            color = "red" if b.is_queen else ("blue" if b.gender == "drone" else "orange" if b.carrying_nectar else "yellow")
-            axes[1].scatter(x, y, c=color, s=100, edgecolors='black')
-    axes[1].set_title("Bee World")
-    axes[1].set_xlabel("position X")
-    axes[1].set_ylabel("position Y")
-
-# Run simulation: limited to 10 time steps
-for timestep in range(10):
-    for b in blist:
-        b.step_change()
-
-    plot_hive()
-    plot_world()
-    fig.suptitle(f"Timestep {timestep + 1} | Hive Cells Built: {hive_cells_built}", fontsize=14)
-    plt.pause(0.5)
-
-plt.ioff()
-plt.show()
+if __name__ == "__main__":
+    main()

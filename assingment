@@ -5,6 +5,15 @@ import argparse
 from enum import Enum, auto
 from matplotlib.patches import RegularPolygon
 
+# Define terrain types
+GRASS = 5
+POND = 0
+POND2 = 14
+FLOWER = 12
+DEPLETED_FLOWER = 13
+TREE = 4
+BUILDING = 8
+
 class BeeState(Enum):
     IN_HIVE = auto()
     SEEKING_NECTAR = auto()
@@ -15,14 +24,6 @@ class BeeType(Enum):
     WORKER = auto()
     DRONE = auto()
 
-GRASS = 5
-POND = 0
-POND2 = 14
-FLOWER = 12
-DEPLETED_FLOWER = 13
-TREE = 4
-BUILDING = 8
-
 class SimulationConfig:
     def __init__(self):
         self.world_size = (100, 80)
@@ -31,6 +32,8 @@ class SimulationConfig:
         self.initial_bees = 25
         self.communication_range = 10
         self.nectar_capacity = 8
+
+config = SimulationConfig()
 
 class World:
     def __init__(self, size):
@@ -42,14 +45,14 @@ class World:
         self.barriers = []
 
     def add_flower(self, pos):
-        self.grid[int(pos[0]), int(pos[1])] = FLOWER
+        self.grid[pos[0], pos[1]] = FLOWER
         self.flowers.append(pos)
 
     def deplete_flower(self, pos):
         if pos in self.flowers:
             self.flowers.remove(pos)
             self.depleted_flowers.append(pos)
-            self.grid[int(pos[0]), int(pos[1])] = DEPLETED_FLOWER
+            self.grid[pos[0], pos[1]] = DEPLETED_FLOWER
 
     def add_tree(self, area):
         x1, x2, y1, y2 = area
@@ -75,12 +78,13 @@ class Hive:
             for i in range(3):
                 x = hive_pos[0] + side * hex_radius * 2
                 y = hive_pos[1] + (i - 1) * vertical_spacing
+                pos = (int(round(x)), int(round(y)))
                 self.hexagons.append((x, y, hex_radius))
-                self.cell_nectar[(x, y)] = 0
+                self.cell_nectar[pos] = 0
 
     def add_honey(self, amount):
         self.honey_stored += amount
-        for pos in self.hexagons:
+        for pos in self.cell_nectar:
             if self.cell_nectar[pos] < 10:
                 self.cell_nectar[pos] = min(10, self.cell_nectar[pos] + amount)
                 break
@@ -88,7 +92,7 @@ class Hive:
 class Bee:
     def __init__(self, bee_id, pos, bee_type):
         self.id = bee_id
-        self.pos = (int(pos[0]), int(pos[1]))
+        self.pos = pos
         self.type = bee_type
         self.state = BeeState.IN_HIVE
         self.carrying_nectar = False
@@ -111,7 +115,7 @@ class Bee:
 
     def communicate_nectar_locations(self, other_bee):
         if self.state == BeeState.IN_HIVE and other_bee.state == BeeState.IN_HIVE:
-            shared_locations = [loc for loc in self.nectar_locations 
+            shared_locations = [loc for loc in self.nectar_locations
                                 if np.linalg.norm(np.array(loc) - np.array(self.pos)) <= config.communication_range]
             other_bee.nectar_locations.extend(shared_locations)
             other_bee.nectar_locations = list(set(other_bee.nectar_locations))
@@ -137,22 +141,21 @@ class Bee:
 
         new_x = max(0, min(world.grid.shape[0]-1, self.pos[0] + dx*2))
         new_y = max(0, min(world.grid.shape[1]-1, self.pos[1] + dy*2))
-        ix, iy = int(new_x), int(new_y)
 
-        if world.grid[ix, iy] in [POND, POND2]:
+        if world.grid[new_x, new_y] in [POND, POND2]:
             self.state = BeeState.RETURNING
             self.current_mission_target = None
             return
 
-        if world.grid[ix, iy] != BUILDING:
-            self.pos = (ix, iy)
+        if world.grid[new_x, new_y] not in [BUILDING]:
+            self.pos = (new_x, new_y)
 
-            if world.grid[ix, iy] == FLOWER and not self.carrying_nectar:
+            if world.grid[new_x, new_y] == FLOWER and not self.carrying_nectar:
                 self.carrying_nectar = True
-                self.nectar_locations.append((ix, iy))
+                self.nectar_locations.append((new_x, new_y))
                 self.state = BeeState.RETURNING
                 self.current_mission_target = None
-                world.deplete_flower((ix, iy))
+                world.deplete_flower((new_x, new_y))
 
     def return_to_hive(self, hive):
         dx = np.sign(hive.hive_pos[0] - self.pos[0])
@@ -166,16 +169,14 @@ class Bee:
             self.carrying_nectar = False
         else:
             self.pos = (
-                int(max(0, min(config.world_size[0]-1, new_x))),
-                int(max(0, min(config.world_size[1]-1, new_y)))
+                max(0, min(config.world_size[0]-1, new_x)),
+                max(0, min(config.world_size[1]-1, new_y))
             )
 
     def deposit_nectar(self, hive):
         if self.carrying_nectar:
             hive.add_honey(3)
             self.carrying_nectar = False
-
-config = SimulationConfig()
 
 def initialize_simulation():
     world = World(config.world_size)
@@ -192,12 +193,12 @@ def initialize_simulation():
     hive = Hive(config.hive_pos)
 
     bees = []
-    spawn_positions = [(random.randint(30, 70), random.randint(30, 50)) 
+    spawn_positions = [(random.randint(30, 70), random.randint(30, 50))
                        for _ in range(config.initial_bees)]
 
     roles = [BeeType.QUEEN] + \
-            [BeeType.DRONE] * int(0.1 * (config.initial_bees - 1)) + \
-            [BeeType.WORKER] * (config.initial_bees - 1 - int(0.1 * (config.initial_bees - 1)))
+            [BeeType.DRONE] * int(0.1 * (config.initial_bees-1)) + \
+            [BeeType.WORKER] * (config.initial_bees - 1 - int(0.1 * (config.initial_bees-1)))
 
     for i, (pos, role) in enumerate(zip(spawn_positions, roles)):
         bees.append(Bee(f"{role.name[0]}{i+1}", pos, role))
@@ -210,7 +211,8 @@ def plot_hive(ax, hive, bees):
 
     for hex_data in hive.hexagons:
         x, y, radius = hex_data
-        nectar = hive.cell_nectar[(x, y)]
+        pos = (int(round(x)), int(round(y)))
+        nectar = hive.cell_nectar.get(pos, 0)
 
         fill_color = (
             1.0 - 0.5*(nectar/10),
@@ -251,60 +253,8 @@ def plot_hive(ax, hive, bees):
 
 def plot_world(ax, world, bees):
     ax.clear()
-    cmap = plt.cm.get_cmap('tab20', 20)
-    colors = cmap(np.arange(20))
-    colors[FLOWER] = [0.3, 0.9, 0.3, 1]
-    colors[DEPLETED_FLOWER] = [0.6, 0.6, 0.6, 1]
-    colors[TREE] = [0.1, 0.5, 0.1, 1]
-    colors[GRASS] = [0.85, 1.0, 0.85, 1]
-    colors[POND] = [0.2, 0.2, 0.9, 1]
-    colors[POND2] = [0.1, 0.1, 0.8, 1]
-    colors[BUILDING] = [0.4, 0.4, 0.4, 1]
+    cmap = plt
+::contentReference[oaicite:0]{index=0}
+ 
 
-    ax.imshow(world.grid.T, origin="lower", cmap=plt.cm.colors.ListedColormap(colors))
-
-    for bee in bees:
-        if not bee.is_in_hive():
-            x, y = bee.get_pos()
-            color = "#FF4500" if bee.type == BeeType.QUEEN else \
-                    "#4169E1" if bee.type == BeeType.DRONE else \
-                    "#FFA500" if bee.carrying_nectar else "#FFD700"
-            ax.scatter(x, y, c=color, s=120, edgecolors='black', zorder=10)
-
-    ax.set_title("Field View", pad=20)
-    ax.set_xlabel("X Coordinate")
-    ax.set_ylabel("Y Coordinate")
-
-def run_simulation(world, hive, bees):
-    plt.ion()
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
-    plt.subplots_adjust(wspace=0.25)
-
-    for timestep in range(config.max_steps):
-        for bee in bees:
-            bee.step_change(world, hive)
-            if bee.is_in_hive() and random.random() < 0.2:
-                others = [b for b in bees if b != bee and b.is_in_hive()]
-                if others:
-                    bee.communicate_nectar_locations(random.choice(others))
-
-        plot_hive(ax1, hive, bees)
-        plot_world(ax2, world, bees)
-        fig.suptitle(f"Bee Colony Simulation - Timestep {timestep + 1}/{config.max_steps}", 
-                     fontsize=16, y=0.97)
-        plt.pause(0.08)
-
-    plt.ioff()
-    plt.show()
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(description="Enhanced Bee Simulation")
-    parser.add_argument("-i", "--interactive", action="store_true", 
-                        help="Enable interactive visualization mode")
-    return parser.parse_args()
-
-if __name__ == "__main__":
-    args = parse_arguments()
-    world, hive, bees = initialize_simulation()
-    run_simulation(world, hive, bees)
 

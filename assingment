@@ -65,28 +65,30 @@ class World:
         self.grid[x1:x2, y1:y2] = barrier_type
         self.barriers.append((area, barrier_type))
 
-# Hive class
+# Hive class with nectar tracking
 class Hive:
     def __init__(self, size, hive_pos):
         self.size = size
         self.hive_pos = hive_pos
         self.honey_stored = 0
         self.cells = np.ones(size) * 10  # Empty cells
-        self.buildable_cells = [(14, 8), (14, 10), (14, 12), 
+        self.buildable_cells = [(14, 8), (14, 10), (14, 12),
                               (14, 14), (14, 16), (14, 18)]
+        self.cell_nectar = {pos: 0 for pos in self.buildable_cells}
+        
         for x, y in self.buildable_cells:
             self.cells[x, y] = 5  # Buildable placeholder
     
     def add_honey(self, amount):
         self.honey_stored += amount
-        if self.honey_stored >= 10 and any(self.cells[x,y] == 5 for x,y in self.buildable_cells):
-            for x, y in self.buildable_cells:
-                if self.cells[x, y] == 5:
-                    self.cells[x, y] = 1  # Built cell
-                    self.honey_stored -= 10
-                    break
+        for pos in self.buildable_cells:
+            if self.cell_nectar[pos] < 10:
+                self.cell_nectar[pos] += amount
+                if self.cell_nectar[pos] >= 10:
+                    self.cells[pos[0], pos[1]] = 1  # Built cell
+                break
 
-# Enhanced Bee class
+# Enhanced Bee class with navigation
 class Bee:
     def __init__(self, bee_id, pos, bee_type):
         self.id = bee_id
@@ -159,14 +161,20 @@ class Bee:
     def return_to_hive(self, hive):
         dx = np.sign(hive.hive_pos[0] - self.pos[0])
         dy = np.sign(hive.hive_pos[1] - self.pos[1])
-        new_x = max(0, min(hive.size[0]-1, self.pos[0] + dx))
-        new_y = max(0, min(hive.size[1]-1, self.pos[1] + dy))
-        self.pos = (new_x, new_y)
+        new_x = self.pos[0] + dx
+        new_y = self.pos[1] + dy
         
-        if self.pos == hive.hive_pos:
+        if (abs(new_x - hive.hive_pos[0]) <= 2 and 
+            abs(new_y - hive.hive_pos[1]) <= 2):
+            self.pos = hive.hive_pos
             self.deposit_nectar(hive)
             self.state = BeeState.IN_HIVE
             self.carrying_nectar = False
+        else:
+            self.pos = (
+                max(0, min(world.grid.shape[0]-1, new_x)),
+                max(0, min(world.grid.shape[1]-1, new_y))
+            )
     
     def deposit_nectar(self, hive):
         if self.carrying_nectar:
@@ -206,10 +214,25 @@ def initialize_simulation():
 
 def plot_hive(ax, hive, bees):
     ax.clear()
-    ax.imshow(hive.cells.T, origin="lower", cmap="YlOrBr", vmin=0, vmax=10)
+    hive_cmap = np.zeros((11, 4))
+    hive_cmap[10] = [1, 1, 0.8, 1]    # Empty
+    hive_cmap[5] = [0.9, 0.8, 0.5, 1] # Buildable
+    for i in range(5):
+        hive_cmap[i] = [0.6 + i*0.08, 0.4 + i*0.1, 0.1, 1]
+    hive_cmap = plt.cm.colors.ListedColormap(hive_cmap)
+    
+    display_cells = hive.cells.copy()
+    for pos, nectar in hive.cell_nectar.items():
+        if nectar > 0 and nectar < 10:
+            display_cells[pos[0], pos[1]] = 5 - (nectar // 2)
+    
+    ax.imshow(display_cells.T, origin="lower", cmap=hive_cmap, vmin=0, vmax=10)
+    
     for bee in bees:
         if bee.is_in_hive():
-            x, y = bee.get_pos()
+            offset = (random.randint(-1,1), random.randint(-1,1))
+            x = hive.hive_pos[0] + offset[0]
+            y = hive.hive_pos[1] + offset[1]
             color = "red" if bee.type == BeeType.QUEEN else \
                    "blue" if bee.type == BeeType.DRONE else "yellow"
             ax.scatter(x, y, c=color, s=100, edgecolors='black')
@@ -221,13 +244,13 @@ def plot_world(ax, world, bees):
     ax.clear()
     cmap = plt.cm.get_cmap('tab20', 20)
     colors = cmap(np.arange(20))
-    colors[FLOWER] = [0, 1, 0, 1]       # Green - active flowers
-    colors[DEPLETED_FLOWER] = [0.5, 0.5, 0.5, 1]  # Gray - depleted
-    colors[TREE] = [0, 0.5, 0, 1]       # Dark green - trees
-    colors[GRASS] = [0.8, 1, 0.8, 1]    # Light green - grass
-    colors[POND] = [0, 0, 1, 1]         # Blue - water
-    colors[POND2] = [0, 0, 0.8, 1]      # Darker blue
-    colors[BUILDING] = [0.3, 0.3, 0.3, 1]  # Dark gray
+    colors[FLOWER] = [0, 1, 0, 1]
+    colors[DEPLETED_FLOWER] = [0.5, 0.5, 0.5, 1]
+    colors[TREE] = [0, 0.5, 0, 1]
+    colors[GRASS] = [0.8, 1, 0.8, 1]
+    colors[POND] = [0, 0, 1, 1]
+    colors[POND2] = [0, 0, 0.8, 1]
+    colors[BUILDING] = [0.3, 0.3, 0.3, 1]
     
     ax.imshow(world.grid.T, origin="lower", cmap=plt.cm.colors.ListedColormap(colors))
     
